@@ -164,6 +164,13 @@ const CONTATOS: Contato[] = [
       "reponha o `actor` no opts e a marcação `contact_protected`. Esta leitura ignora RLS, então sem o ator o telefone sai para qualquer atendente.",
   },
   {
+    arquivo: "lib/crm-b2b/people-handler.ts",
+    marca: "protegerContato(c, ctx.actor)",
+    oQueE: "a proteção na ficha da pessoa (CRM B2B) e no vínculo contato↔pessoa",
+    seSumir:
+      "reponha `protegerContato` nos contatos de `getPersonHandler` e `protegerTelefoneDoContatoEmbutido` no retorno de `linkContactToPersonHandler`, com `created_by_user_id` nos dois selects. Sem isso, /api/v1/people/:id devolve telefone e e-mail a qualquer viewer.",
+  },
+  {
     arquivo: "lib/reports/atividades.ts",
     marca: "podeVerContatoSensivel",
     oQueE: "a proteção no relatório de atividades",

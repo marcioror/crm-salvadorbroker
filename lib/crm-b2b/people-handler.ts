@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { ApiError } from "@/lib/api/types";
 import type { HandlerCtx } from "@/lib/api/handlers/types";
 import { audit } from "@/lib/audit";
+import { protegerContato, protegerTelefoneDoContatoEmbutido } from "@/lib/contacts/visibility";
 import { normalizePersonName } from "@/lib/crm-b2b/normalize";
 import {
   companyPersonCreateSchema,
@@ -69,12 +70,15 @@ export async function getPersonHandler(supabase: SB, ctx: HandlerCtx, id: string
 
   const { data: contacts } = await supabase
     .from("contacts")
-    .select("id, phone_number, display_name, name, email, is_blocked, person_id")
+    .select("id, phone_number, display_name, name, email, is_blocked, person_id, created_by_user_id")
     .eq("organization_id", ctx.organization_id)
     .eq("person_id", id)
     .is("is_merged_into", null);
 
-  return { person: data, companies: links ?? [], contacts: contacts ?? [] };
+  // Proteção de contato desta casa: a ficha da pessoa não é porta dos fundos
+  // para o telefone e o e-mail que a rota /contacts esconde do corretor.
+  const protegidos = (contacts ?? []).map((c) => protegerContato(c, ctx.actor));
+  return { person: data, companies: links ?? [], contacts: protegidos };
 }
 
 export async function createPersonHandler(
@@ -249,7 +253,7 @@ export async function linkContactToPersonHandler(
     .update({ person_id: personId })
     .eq("organization_id", ctx.organization_id)
     .eq("id", contactId)
-    .select("id, person_id, phone_number, display_name")
+    .select("id, person_id, phone_number, display_name, created_by_user_id")
     .maybeSingle();
 
   if (error) err(ctx, 422, "validation_failed", error.message);
@@ -264,5 +268,6 @@ export async function linkContactToPersonHandler(
     requestId: ctx.requestId,
     metadata: { person_id: personId },
   });
-  return data;
+  // Mesma proteção da ficha: vincular não devolve o telefone a quem não o vê.
+  return protegerTelefoneDoContatoEmbutido(data, ctx.actor);
 }
