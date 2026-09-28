@@ -12,7 +12,8 @@ export type ActionType =
   | "add_tag"
   | "assign_owner"
   | "call_webhook"
-  | "start_message_flow";
+  | "start_message_flow"
+  | "create_task";
 
 export const TRIGGER_LABELS: Record<TriggerEvent, string> = {
   "lead.created": "Quando entrar um contato novo (webhook)",
@@ -32,11 +33,20 @@ export const TRIGGER_LABELS: Record<TriggerEvent, string> = {
   "appointment.confirmed": "Quando um horário pendente for confirmado",
   "appointment.rescheduled": "Quando um horário for remarcado",
   "appointment.cancelled": "Quando um horário for cancelado",
+  // O desfecho (#1612): a frase diz o que a EQUIPE registrou na tela —
+  // "compareceu" e "faltou" são os botões Realizado/Faltou do histórico, e
+  // usar outro vocabulário aqui faria o operador procurar o gatilho que já viu.
+  "appointment.completed": "Quando alguém comparecer ao compromisso",
+  "appointment.no_show": "Quando alguém faltar ao compromisso",
   "contact.birthday": "No aniversário de um contato",
   // A frase diz o que a regra vê ("uma data do funil"), e não o que o operador
   // escreveu — o campo é escolhido embaixo, e o mesmo rótulo serve para "data
   // do casamento", "vencimento" e "data da prova".
   "lead.date_field_due": "Quando faltarem N dias para uma data do funil",
+  // #1540 — gatilhos por TEMPO: a frase diz a DURAÇÃO, e os detalhes (N, direção,
+  // funil) ficam embaixo, na configuração da regra.
+  "lead.silent_for": "Quando ficar N dias sem mensagem",
+  "lead.stage_stale": "Quando um lead ficar N dias na mesma etapa",
 };
 
 export const ACTION_LABELS: Record<ActionType, string> = {
@@ -47,4 +57,6 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   assign_owner: "Atribuir a um atendente",
   call_webhook: "Avisar outro sistema (webhook)",
   start_message_flow: "Iniciar fluxo de mensagem",
+  // #1540 — a ação que não fala com o cliente: o lembrete é da equipe.
+  create_task: "Criar tarefa interna (sem mensagem ao cliente)",
 };

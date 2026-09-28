@@ -201,6 +201,23 @@ export const ApiErrorCodes = {
   pipeline_no_lost_stage: "pipeline_no_lost_stage",
   // 404: o funil de destino não existe (ou não é desta organização).
   pipeline_not_found: "pipeline_not_found",
+  // 409 (issue #1538): o funil é `novo_negocio` e a escrita reabriria um
+  // negócio encerrado. Os QUATRO caminhos (arrasto, lote, IA/automação, MCP)
+  // devolvem este mesmo código, e a tela o reconhece para oferecer a retomada.
+  reabertura_cria_novo: "reabertura_cria_novo",
+  // 422: chamaram `/retomar` num negócio que continua ABERTO — não há o que
+  // retomar, e criar aí duplicaria o card que já está no quadro.
+  reabertura_lead_aberto: "reabertura_lead_aberto",
+  // ─── CAMPOS OBRIGATÓRIOS E MOTIVO DE GANHO (issue #1536) ───
+  //
+  // As duas recusas do núcleo novo, cada uma com a sua demanda: a primeira pede
+  // PREENCHER (o `details.faltando` nomeia chave e rótulo de cada campo — e
+  // quando o que falta é o motivo de ganho a chave é `won_reason`, um caso do
+  // mesmo contrato, não um código à parte), a segunda pede ESCOLHER da lista
+  // cadastrada (`settings.won_reasons`). Colapsá-las mandaria quem já informou
+  // escolher sem lista, e quem não informou digitar sem caminho.
+  required_fields_missing: "required_fields_missing",
+  won_reason_invalid: "won_reason_invalid",
 
   // ─── AVISO DE CASO NO WHATSAPP (migration 0292, onda 8) ───
   //
@@ -245,6 +262,7 @@ export const ApiErrorCodes = {
   upstream_unavailable: "upstream_unavailable",
   unavailable: "unavailable", // 503: dependência de config ausente (ex.: pool do engine sem SUPABASE_DB_URL)
   waha_error: "waha_error",
+  channel_unavailable: "channel_unavailable", // 502: o transporte do canal não respondeu (ex.: listar grupos com a sessão fora de WORKING)
   wacalls_error: "wacalls_error", // 502: o serviço de chamada de voz recusou ou não respondeu
   wacalls_not_connected: "wacalls_not_connected", // 503 + Retry-After: sessão pareada cujo socket com o WhatsApp caiu por um instante (ver `wacallsSemConexao`)
   ai_provider_error: "ai_provider_error",
