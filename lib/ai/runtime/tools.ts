@@ -20,7 +20,8 @@ import { McpAuthError, ensureRole, ensureScope } from "@/lib/mcp/auth";
 import type { McpAuthResult } from "@/lib/mcp/auth";
 import { logger } from "@/lib/logger";
 import { allTools, getToolByName } from "@/lib/mcp/tools";
-import { catalogEntry, deModuloDesligado } from "@/lib/mcp/tools/catalog";
+import { catalogEntry, deCapacidadeDesligada, deModuloDesligado } from "@/lib/mcp/tools/catalog";
+import type { CapacidadeDaOrganizacao } from "@/lib/organizacao/capacidades";
 import type { ModuloOpcional } from "@/lib/instalacao/modulos";
 import { higienizarUuidsDeAterro } from "@/lib/mcp/uuid-de-aterro";
 import { recusaDeCapacidadeParaOModelo } from "@/lib/mcp/recusa-para-o-modelo";
@@ -40,6 +41,7 @@ export interface PickToolsInput {
   auth: McpAuthResult;
   toolIds: string[];
   handoffToolEnabled: boolean;
+  proposalAiDraftEnabled?: boolean;
   /**
    * Funis em que ESTE agente pode escrever (`ai_agent_versions.pipeline_ids`).
    *
@@ -54,6 +56,11 @@ export interface PickToolsInput {
    * tenha perguntado — a direção segura, como a de `pipelineIds`.
    */
   modulosLigados?: readonly ModuloOpcional[];
+  /**
+   * Capacidades que a ORGANIZAÇÃO ligou (`capacidadesDaOrganizacao()`). Ausente
+   * vale como nenhuma, pela mesma razão de `modulosLigados`.
+   */
+  capacidadesLigadas?: readonly CapacidadeDaOrganizacao[];
   /** Mutable signal — runtime checks after each step. */
   handoffSignal: RuntimeHandoffSignal;
   /**
@@ -99,6 +106,8 @@ export async function leadIdDoContatoDoTurno(
 }
 
 const HANDOFF_TOOL_NAME = "crm_request_human_handoff";
+const DRAFT_PROPOSAL_TOOL_NAME = "crm_draft_proposal";
+const PREPARAR_PROPOSTA_TOOL_NAME = "crm_preparar_proposta";
 
 function shapeToZodObject(shape: Record<string, z.ZodTypeAny>): z.ZodTypeAny {
   // The MCP tool inputSchema is a Zod *raw shape* (object of zod types).
@@ -336,6 +345,20 @@ export function pickToolsFromMcp(input: PickToolsInput): Record<string, Tool> {
     // agente a tenha marcada de quando o módulo estava ligado.
     if (deModuloDesligado(def.name, input.modulosLigados ?? [])) continue;
 
+    // Capacidade que a ORGANIZAÇÃO desligou: a ferramenta não é oferecida ao
+    // modelo, mesmo marcada na versão do agente.
+    if (deCapacidadeDesligada(def.name, input.capacidadesLigadas ?? [])) continue;
+
+    // A chave da VERSÃO DO AGENTE manda nos dois sentidos: antes ela só
+    // impedia o acréscimo automático, e a ferramenta vinda do pacote `vender`
+    // passava com a chave desligada. Vale para o rascunho e para o preparo —
+    // os dois andam juntos, nas mesmas condições.
+    if (
+      (def.name === DRAFT_PROPOSAL_TOOL_NAME || def.name === PREPARAR_PROPOSTA_TOOL_NAME) &&
+      !input.proposalAiDraftEnabled
+    )
+      continue;
+
     result[def.name] = wrapMcpTool(def, input);
   }
 
@@ -345,6 +368,19 @@ export function pickToolsFromMcp(input: PickToolsInput): Record<string, Tool> {
     const handoff = allTools.find((t) => t.name === HANDOFF_TOOL_NAME);
     if (handoff) {
       result[HANDOFF_TOOL_NAME] = wrapMcpTool(handoff, input);
+    }
+  }
+
+  // A ferramenta de rascunho entra sozinha quando a chave da versão está
+  // ligada — o preparo vai junto, nas mesmas condições: sem ele o modelo não
+  // tem como saber o que perguntar antes de rascunhar.
+  if (input.proposalAiDraftEnabled) {
+    for (const nome of [DRAFT_PROPOSAL_TOOL_NAME, PREPARAR_PROPOSTA_TOOL_NAME]) {
+      if (deCapacidadeDesligada(nome, input.capacidadesLigadas ?? []) || result[nome]) continue;
+      const tool = allTools.find((t) => t.name === nome);
+      if (tool) {
+        result[nome] = wrapMcpTool(tool, input);
+      }
     }
   }
 

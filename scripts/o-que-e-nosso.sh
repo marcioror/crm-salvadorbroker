@@ -225,6 +225,8 @@ contato "app/api/v1/contacts/_handler.ts" "protegerContato" "a proteção aplica
 contato "app/api/v1/conversations/_handler.ts" "protegerConversaComContato" "a proteção no contato embutido da conversa"
 contato "app/api/v1/messages/_handler.ts" "comExternalIdNormalizado" "o external_id que não carrega telefone"
 contato "lib/escalacao/chamados.ts" "podeVerContatoSensivel" "a proteção na fila de casos, que lê com service role"
+contato "lib/crm-b2b/people-handler.ts" "protegerContato(c, ctx.actor)" "a proteção na ficha da pessoa e no vínculo contato-pessoa"
+contato "components/kanban/NewLeadDialog.tsx" 'className="max-h-[90vh] overflow-y-auto"' "o diálogo de lead novo que cabe numa tela de 720 px"
 contato "lib/reports/atividades.ts" "podeVerContatoSensivel" "a proteção no relatório de atividades"
 contato "lib/leads/nascimento-do-lead.ts" "nomeDoContato(contato)" "o título do lead que não grava telefone"
 contato "lib/automation/actions/create-or-move-lead.ts" "SEM FALLBACK PARA O TELEFONE" "o título do lead da automação sem telefone"

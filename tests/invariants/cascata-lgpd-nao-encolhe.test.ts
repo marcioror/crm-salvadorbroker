@@ -65,6 +65,10 @@ const TABELAS_NA_CASCATA = [
   "conversations", //      0019 — metadata e prévia da última mensagem
   "crm_lead_activities", //0071 — payload, metadata e `reason` escrito por LLM
   "crm_leads", //          0019 — título, descrição, campos personalizados, tags
+  // 0477 — destinatario_nome (nome impresso no PDF), briefing_json e
+  // resumo_comercial. O número, os valores, os itens, as datas e o status
+  // FICAM: é o documento comercial que a organização precisa poder auditar.
+  "crm_proposals",
   "demandas", //           0280 — o assunto do pedido
   // 0292 — `erro_detalhe` do registro de entrega do aviso: é o texto CRU que o
   // transporte devolveu, e um provedor que recusa um envio costuma devolver o
@@ -92,6 +96,12 @@ const TABELAS_NA_CASCATA = [
   // `lgpd-alcanca-prospeccao-de-quem-ja-era-contato.test.ts`.
   "prospecting_candidates",
   "voice_calls", //        0235 — o telefone de quem falou ao telefone
+  // 0482 — `subject` é o NOME do grupo de WhatsApp. `contact_id` aponta para o
+  // placeholder do grupo (contacts.kind = 'whatsapp_group'), nunca para o
+  // titular real deste caminho, mas casa o padrão automático de
+  // `lgpd-cascata-alcanca-quem-guarda-pessoa.test.ts` (FK para `contacts` +
+  // coluna de nome-de-PII), e nulificar não perde nada operacional.
+  "channel_session_groups",
 ] as const;
 
 /**

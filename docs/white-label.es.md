@@ -1,4 +1,4 @@
-<!-- traduzido-de: docs/white-label.md@ca7f3c3481e2 -->
+<!-- traduzido-de: docs/white-label.md@6a25e768d53e -->
 
 [🇧🇷 Português](white-label.md) · [🇺🇸 English](white-label.en.md) · 🇪🇸 Español
 
@@ -17,6 +17,8 @@ La licencia es MIT: puedes modificarlo, alojarlo para terceros, revenderlo y cob
 El color es **derivado**, no aplicado en crudo: de un hex salen once tonos en los dos temas (claro y oscuro), con un piso de contraste calculado por papel y por superficie. Si el color que elegiste quedaría ilegible como texto de botón en el tema oscuro, el sistema recorre los peldaños necesarios y la pantalla **te muestra** en qué tono va a aterrizar cada cosa, antes de guardar. Nada de "elegí amarillo y el botón quedó blanco sobre blanco".
 
 **El logo también.** En la misma pantalla **subes el archivo** — PNG o JPG, hasta 512 KB. Va al almacenamiento de tu propia instalación y pasa a valer al instante, sin reiniciar nada y sin que tengas que alojar la imagen en ningún sitio. Altura fija y ancho libre, para no deformar un arte de cualquier proporción; sin logo, el nombre aparece como texto.
+
+**Y el ícono de la aplicación y del navegador.** Debajo del logo, este campo acepta un PNG o JPG cuadrado de hasta 512 KB, preferiblemente 512×512 o mayor. La misma imagen aparece en las pestañas, incluido el acceso, y en la aplicación instalada. El manifiesto ofrece PNG de 192×192 y 512×512, renderizados desde el archivo limitado de la instalación en Storage; nunca se buscan URL arbitrarias. Sin archivo válido, conserva el símbolo del producto o la inicial de la marca. Quitar el archivo restaura ese dibujo. Es la marca de la instalación, no de cada organización. El navegador puede guardar una instalación anterior en caché; reinstala la aplicación para comprobar un nuevo ícono.
 
 El archivo se acepta **por sus bytes, no por su extensión**. Renombrar un `.svg` a `.png` no engaña: el sistema lee el contenido, lo rechaza y dice por qué. Esto no es quisquillosidad — SVG es XML y puede llevar script, que se ejecutaría si alguien abriera la imagen directamente por su dirección, en un bucket que es público por necesidad.
 
@@ -167,7 +169,7 @@ La **Resolución CD/ANPD nº 19/2024** volvió obligatorias las cláusulas contr
 
 Todo cliente tuyo que use un CRM extranjero realiza esa transferencia y necesita el artefacto contractual. Alojando en una VPS en Brasil, **el CRM en sí no transfiere datos fuera del país** — y, para él, la obligación no se aplica.
 
-⚠️ **La salvedad es la IA, y vale para casi toda instalación.** La frase de arriba solo es completa mientras ningún proveedor de IA extranjero esté activado. La atención automática envía la conversación al proveedor que el cliente conectó (Anthropic, OpenAI, Google, DeepSeek u OpenRouter, todos fuera de Brasil). Jev, cuando el administrador lo activa en IA › Proveedores, envía cada mensaje de los clientes a TypeSafe AI, en Estados Unidos, uno por vez y sin el resto de la conversación, después de borrar CPF, teléfono y correo electrónico. En esos flujos hay transferencia internacional, y las cláusulas estándar valen para ellos. Jev viene desactivado y pide el consentimiento de quien administra antes de enviar nada; la IA de atención, no.
+⚠️ **La salvedad es la IA, y vale para casi toda instalación.** La frase de arriba solo es completa mientras ningún proveedor de IA extranjero esté activado. La atención automática envía la conversación al proveedor que el cliente conectó (Anthropic, OpenAI, Google, DeepSeek u OpenRouter, todos fuera de Brasil). Jev, cuando el administrador lo activa en IA › Proveedores, envía cada mensaje de los clientes a TypeSafe AI, en Estados Unidos, uno por vez y sin el resto de la conversación, después de borrar CPF, teléfono y correo electrónico. Cada tarea de Jev tiene su finalidad — medir el clima de la conversación, notar intentos de manipular la atención automática y elegir qué agente atiende — y todas usan solo ese mensaje, por separado. Para elegir el agente, van junto las intenciones que la propia empresa registró en el enrutador (texto de ella, no del cliente). En esos flujos hay transferencia internacional, y las cláusulas estándar valen para ellos. Jev viene desactivado y pide el consentimiento de quien administra antes de enviar nada; la IA de atención, no.
 
 ⚠️ **No lo vendas como "servidor en Brasil = conformidad con la LGPD".** Eso es falso y un abogado lo desmonta en la primera pregunta: la conformidad depende de base legal, finalidad, seguridad y derechos del titular. El argumento correcto y defendible es el de arriba: sin transferencia internacional, no hay exigencia de cláusulas estándar.
 

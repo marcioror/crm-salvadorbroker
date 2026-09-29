@@ -29,11 +29,12 @@ import { InboxKeyboardShortcuts } from "./InboxKeyboardShortcuts";
 import { ShortcutsHelpDialog } from "./ShortcutsHelpDialog";
 import { OpenConversationProvider } from "@/hooks/notifications/OpenConversationContext";
 // ADR-05: ícone de feature sai do mapa canônico, nunca do pacote direto.
-import { CaretLeft, ChatCircle, IdentificationCard } from "@/lib/ui/icons";
+import { CaretLeft, ChatCircle, IdentificationCard, MagnifyingGlass, X } from "@/lib/ui/icons";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 import { comandosDaFila } from "@/lib/inbox/comando-da-conversa";
+import type { AvisoDeRascunho } from "@/lib/inbox/rascunho-sugerido";
 import { buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
 import { useAutomaticoAtivo } from "@/hooks/ai/useAutomaticoAtivo";
 
@@ -123,9 +124,11 @@ function parseFilterParam(v: string | null): InboxTab {
 
 interface InboxLayoutProps {
   initialSelectedId?: string | null;
+  /** Rascunho sugerido por integração (issue #1611) — `null` é o caso comum. */
+  rascunho?: AvisoDeRascunho | null;
 }
 
-export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {}) {
+export function InboxLayout({ initialSelectedId = null, rascunho = null }: InboxLayoutProps = {}) {
   const t = useT();
   const { activeOrg, user } = useAuth();
   const supportReadonly = user.support?.access_mode === "support_readonly";
@@ -141,6 +144,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   const [aux, setAux] = useState<Omit<InboxFiltersValue, "tab">>({
     search: "",
     onlyUnread: false,
+    onlyGroups: false,
   });
   const filterValue: InboxFiltersValue = { tab, ...aux };
   const setFilterValue = useCallback(
@@ -159,7 +163,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   // Desliga só os AUXILIARES e mantém a aba: a aba é onde a pessoa está, e
   // limpá-la junto a tiraria do lugar sem ela ter pedido.
   const limparFiltrosAuxiliares = useCallback(() => {
-    setFilterValue({ tab, search: "", onlyUnread: false });
+    setFilterValue({ tab, search: "", onlyUnread: false, onlyGroups: false });
   }, [tab, setFilterValue]);
 
   const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId ?? idNaUrl);
@@ -169,12 +173,33 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
   /** A ficha do contato como painel deslizante — só existe abaixo do `xl`. */
   const [fichaAberta, setFichaAberta] = useState(false);
   /**
+   * A busca dentro da conversa (#1793) pertence à CONVERSA em que foi aberta.
+   * Guardar o id junto fecha a busca em qualquer troca — clique, atalho j/k,
+   * voltar do navegador — sem que cada caminho precise lembrar de limpá-la.
+   */
+  const [busca, setBusca] = useState<{ conversaId: string; termo: string } | null>(null);
+  const buscaAberta = busca !== null && busca.conversaId === selectedId;
+  const botaoBuscaRef = useRef<HTMLButtonElement | null>(null);
+  const fecharBusca = useCallback(() => {
+    setBusca(null);
+    botaoBuscaRef.current?.focus();
+  }, []);
+  /**
    * A mensagem escolhida para responder "em cima".
    *
    * Mora aqui, e não no composer, porque quem ESCOLHE é a lista de mensagens e
    * quem MOSTRA é o composer — são irmãos, e o estado comum é do pai.
    */
   const [respondendo, setRespondendo] = useState<ConversationMensagem | null>(null);
+  /**
+   * O rascunho sugerido (#1611) vale para a conversa da URL e só enquanto ela
+   * está aberta: sair dela — clique, atalho ou voltar do navegador — o descarta
+   * de vez. Sem isto o texto escrito para um cliente ficava no campo do próximo,
+   * já sem a faixa de origem. Ajuste de estado durante o render, o padrão do
+   * React para "estado que depende de outro estado".
+   */
+  const [rascunhoVivo, setRascunhoVivo] = useState(rascunho);
+  if (rascunhoVivo && selectedId !== rascunhoVivo.conversationId) setRascunhoVivo(null);
 
   useEffect(() => {
     if (ultimoIdNaUrl.current === idNaUrl) return;
@@ -210,6 +235,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
       channel_session_id: filterValue.channel_session_id,
       tag: filterValue.tag,
       unread: filterValue.onlyUnread || undefined,
+      is_group: filterValue.onlyGroups || undefined,
     }),
     [
       filterValue.tab,
@@ -218,6 +244,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
       filterValue.channel_session_id,
       filterValue.tag,
       filterValue.onlyUnread,
+      filterValue.onlyGroups,
     ],
   );
 
@@ -294,6 +321,8 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
     const params = new URLSearchParams(searchParams.toString());
     if (id) params.set("id", id);
     else params.delete("id");
+    // O ?rascunho= é da conversa que ficou para trás (ver `rascunhoVivo`).
+    params.delete("rascunho");
     const query = params.toString();
     window.history.pushState(null, "", query ? `${pathname}?${query}` : pathname);
   }, [selectedId, searchParams, pathname]);
@@ -508,10 +537,44 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
               key={selectedConversation.id}
               conversation={selectedConversation}
               onAbrirConversa={handleSelect}
+              onBuscar={() =>
+                buscaAberta
+                  ? fecharBusca()
+                  : setBusca({ conversaId: selectedConversation.id, termo: "" })
+              }
+              buscaAberta={buscaAberta}
+              botaoBuscaRef={botaoBuscaRef}
             />
+            {buscaAberta && (
+              <div className="flex items-center gap-2 border-b border-border px-4 py-1.5">
+                <MagnifyingGlass size={16} className="shrink-0 text-muted-foreground" aria-hidden />
+                <input
+                  type="search"
+                  autoFocus
+                  className="min-w-0 flex-1 bg-transparent py-1 text-sm outline-hidden placeholder:text-muted-foreground"
+                  aria-label={t("Buscar nas mensagens carregadas")}
+                  placeholder={t("Buscar nas mensagens carregadas")}
+                  value={busca.termo}
+                  onChange={(e) => setBusca({ conversaId: busca.conversaId, termo: e.target.value })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") fecharBusca();
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-11 shrink-0 px-0 lg:w-8"
+                  aria-label={t("Fechar busca")}
+                  onClick={fecharBusca}
+                >
+                  <X size={16} aria-hidden />
+                </Button>
+              </div>
+            )}
             <div className="min-h-0 flex-1 overflow-hidden">
               <ChatThread
                 conversationId={selectedConversation.id}
+                searchTerm={buscaAberta ? busca.termo : ""}
                 provider={selectedConversation.channel_sessions?.provider ?? null}
                 onResponder={setRespondendo}
                 // O cartão da passagem escolhe o gesto a partir de quem é o dono
@@ -544,6 +607,10 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
               />
             )}
             <Composer
+              // Trocar a chave quando o rascunho sai REMONTA o composer: o texto
+              // nasce de `useState(initialDraft)`, e só a prop mudar não o limparia.
+              // Sem rascunho a chave é fixa e a troca de conversa segue como antes.
+              key={rascunhoVivo ? `rascunho:${rascunhoVivo.conversationId}` : "composer"}
               ref={composerRef}
               conversationId={selectedConversation.id}
               blockedReason={supportReadonly ? "Acompanhamento somente leitura" : blockedReason}
@@ -553,6 +620,12 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
               respondendo={respondendo}
               onCancelarResposta={() => setRespondendo(null)}
               currentContactId={selectedConversation.contact_id}
+              // O aviso é DA conversa da URL: trocar de conversa dentro da inbox
+              // não pode deixar um texto sugerido no campo de outra pessoa.
+              rascunho={rascunhoVivo}
+              initialDraft={
+                rascunhoVivo?.leitura.estado === "sugerido" ? rascunhoVivo.leitura.texto : ""
+              }
             />
           </>
         ) : selectionNotFound ? (
@@ -568,7 +641,7 @@ export function InboxLayout({ initialSelectedId = null }: InboxLayoutProps = {})
         )}
       </div>
 
-      <div className="hidden h-full min-h-0 xl:block">
+      <div className="hidden h-full min-h-0 min-w-0 xl:block">
         <CRMSidePanel conversation={selectedConversation} />
       </div>
 

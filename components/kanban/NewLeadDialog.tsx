@@ -179,7 +179,10 @@ export function NewLeadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      {/* Altura contida e rolagem própria: com a lista do seletor de contato
+          aberta, o diálogo passava de 720 px e o botão "Criar lead" ficava
+          fora da tela, sem como rolar até ele. */}
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t("Novo Lead")}</DialogTitle>
           <DialogDescription>

@@ -278,6 +278,39 @@ describe("o pino do WhatsApp — o webhook não traz as coordenadas", () => {
     expect(ins.metadata).toEqual({ location: { latitude: -25.334888, longitude: -57.543594 } });
   });
 
+  it("lugar com nome ('📍 Praça…'): também busca, e grava nome, endereço e link", async () => {
+    // Caso real (24/09/2026): o cliente escolheu uma praça no mapa; o webhook
+    // trouxe só "📍 Praça da Matriz", e a API trouxe coordenadas, nome e endereço.
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      listagem([
+        {
+          id: "wamid.PRACA",
+          message: "📍 Praça da Matriz",
+          metadata: { location: { latitude: -23.55, longitude: -46.63, name: "Praça da Matriz", address: "Centro, São Paulo, SP" } },
+        },
+      ]),
+    );
+    await ingestZernioInbound(admin, {
+      ...ENTRADA,
+      payload: evento({ text: "📍 Praça da Matriz", platformMessageId: "wamid.PRACA" }),
+    });
+    const ins = ops.find((o) => o.tabela === "messages" && o.op === "insert")?.payload as Record<string, unknown>;
+    expect(ins.type).toBe("location");
+    expect(ins.body).toBe("📍 Praça da Matriz — Centro, São Paulo, SP — https://maps.google.com/?q=-23.55,-46.63");
+  });
+
+  it("texto que só COMEÇA com o alfinete e não é pino na API segue como texto", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      listagem([{ id: "wamid.TXT", message: "📍 minha casa é a do portão azul", metadata: {} }]),
+    );
+    await ingestZernioInbound(admin, {
+      ...ENTRADA,
+      payload: evento({ text: "📍 minha casa é a do portão azul", platformMessageId: "wamid.TXT" }),
+    });
+    const ins = ops.find((o) => o.tabela === "messages" && o.op === "insert")?.payload as Record<string, unknown>;
+    expect(ins).toMatchObject({ type: "text", body: "📍 minha casa é a do portão azul" });
+  });
+
   it("API fora do ar: a mensagem entra como antes, com o marcador — nunca se perde", async () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("ECONNRESET"));
     const r = await ingestZernioInbound(admin, { ...ENTRADA, payload: pino() });
@@ -377,6 +410,28 @@ describe("envio feito FORA do CRM aparece no histórico", () => {
   });
 });
 
+describe("clique em anúncio", () => {
+  it("o referral em metadata marca o contato como vindo do anúncio (primeiro toque)", async () => {
+    // Forma real do Zernio (24/09/2026): `metadata.referral`, no nível do evento.
+    const r = await ingestZernioInbound(admin, {
+      ...ENTRADA,
+      payload: {
+        ...evento(),
+        metadata: {
+          referral: { ctwa_clid: "ARAkZ_sintetico", source_id: "1202", source_type: "ad", headline: "FRETE GRÁTIS" },
+        },
+      },
+    });
+    expect(r.status).toBe("ingested");
+    const estampa = ops.find((o) => o.tabela === "rpc" && o.op === "fn_estampar_atribuicao_de_anuncio");
+    expect(estampa?.payload).toMatchObject({
+      p_org: "org-1",
+      p_platform: "meta_ads",
+      p_metadata: { ad_source_id: "ARAkZ_sintetico", ad_id: "1202", ad_title: "FRETE GRÁTIS" },
+    });
+  });
+});
+
 describe("desfecho de entrega", () => {
   const statusEvt = (event: string, extra: Record<string, unknown> = {}) => ({
     ...evento({ direction: "outgoing" }),
@@ -402,6 +457,35 @@ describe("desfecho de entrega", () => {
     });
     const up = ops.find((o) => o.tabela === "messages" && o.op === "update");
     expect(String((up?.payload as Record<string, unknown>).error_message)).toContain("131047");
+  });
+
+  it("delivered carimba delivered_at com a hora do WhatsApp, uma vez só", async () => {
+    await ingestZernioInbound(admin, {
+      ...ENTRADA,
+      payload: statusEvt("message.delivered", { statusAt: "2026-09-24T16:10:35.000Z" }),
+    });
+    const carimbo = ops.find(
+      (o) => o.tabela === "messages" && o.op === "update" && (o.payload as Record<string, unknown>)?.delivered_at,
+    );
+    expect(carimbo?.payload).toEqual({ delivered_at: "2026-09-24T16:10:35.000Z" });
+    expect(ops.some((o) => o.tabela === "messages" && o.op === "update.is" && o.payload === "delivered_at")).toBe(true);
+    expect(ops.some((o) => (o.payload as Record<string, unknown> | undefined)?.read_at)).toBe(false);
+  });
+
+  it("read carimba read_at — e delivered_at, se a entrega nunca foi carimbada", async () => {
+    await ingestZernioInbound(admin, {
+      ...ENTRADA,
+      payload: statusEvt("message.read", { statusAt: "2026-09-24T14:24:23.000Z" }),
+    });
+    const carimbos = ops
+      .filter((o) => o.tabela === "messages" && o.op === "update" && !("status" in ((o.payload as object) ?? {})))
+      .map((o) => o.payload);
+    expect(carimbos).toEqual([
+      { delivered_at: "2026-09-24T14:24:23.000Z" },
+      { read_at: "2026-09-24T14:24:23.000Z" },
+    ]);
+    const guardas = ops.filter((o) => o.tabela === "messages" && o.op === "update.is").map((o) => o.payload);
+    expect(guardas).toEqual(["delivered_at", "read_at"]);
   });
 
   it("NÃO rebaixa: um delivered atrasado não desfaz um read", async () => {

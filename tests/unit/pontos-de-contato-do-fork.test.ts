@@ -164,6 +164,20 @@ const CONTATOS: Contato[] = [
       "reponha o `actor` no opts e a marcação `contact_protected`. Esta leitura ignora RLS, então sem o ator o telefone sai para qualquer atendente.",
   },
   {
+    arquivo: "lib/crm-b2b/people-handler.ts",
+    marca: "protegerContato(c, ctx.actor)",
+    oQueE: "a proteção na ficha da pessoa (CRM B2B) e no vínculo contato↔pessoa",
+    seSumir:
+      "reponha `protegerContato` nos contatos de `getPersonHandler` e `protegerTelefoneDoContatoEmbutido` no retorno de `linkContactToPersonHandler`, com `created_by_user_id` nos dois selects. Sem isso, /api/v1/people/:id devolve telefone e e-mail a qualquer viewer.",
+  },
+  {
+    arquivo: "components/kanban/NewLeadDialog.tsx",
+    marca: 'className="max-h-[90vh] overflow-y-auto"',
+    oQueE: "o diálogo de lead novo que cabe numa tela de 720 px",
+    seSumir:
+      "reponha a classe no `DialogContent`. Sem ela, com a lista do seletor de contato aberta, o botão \"Criar lead\" fica fora da tela e o properties.spec reprova em waitForResponse. Se o upstream corrigir do jeito dele, este ponto sai.",
+  },
+  {
     arquivo: "lib/reports/atividades.ts",
     marca: "podeVerContatoSensivel",
     oQueE: "a proteção no relatório de atividades",

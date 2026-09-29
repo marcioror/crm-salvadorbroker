@@ -243,6 +243,42 @@ export const PONTOS_DE_IA: readonly PontoDeIa[] = [
     registraEm: "llm_calls",
   },
   {
+    id: "proposal_assistant",
+    rotulo: "Ajustar proposta por instrução",
+    oQueFaz:
+      "Interpreta um pedido curto ('baixa 10% e tira a hospedagem') e monta as mudanças na proposta comercial, para uma pessoa revisar antes de aplicar.",
+    papel: "atender",
+    exige: { tools: true },
+    emissor: "lib/propostas/assistente.ts",
+    sintomaDeFalha:
+      "O botão de ajustar a proposta por instrução não devolve nenhuma mudança, e quem está editando precisa mexer campo por campo à mão.",
+    registraEm: "llm_calls",
+  },
+  {
+    id: "proposal_fill_from_conversation",
+    rotulo: "Preencher proposta com a conversa",
+    oQueFaz:
+      "Lê a conversa com o cliente e sugere valores para os campos que faltam preencher no documento da proposta, para uma pessoa revisar e confirmar campo por campo.",
+    papel: "atender",
+    exige: { tools: true },
+    emissor: "lib/propostas/preencher-com-conversa.ts",
+    sintomaDeFalha:
+      "O botão 'Preencher com a conversa' não sugere nada, e quem revisa preenche cada campo lendo a conversa manualmente.",
+    registraEm: "llm_calls",
+  },
+  {
+    id: "proposal_template_import",
+    rotulo: "Transformar proposta da empresa em modelo",
+    oQueFaz:
+      "Lê a proposta que a empresa já usa (PDF ou texto) e a divide em seções de modelo, trocando os dados de um cliente específico por campos preenchíveis, para uma pessoa revisar antes de salvar.",
+    papel: "atender",
+    exige: { tools: true },
+    emissor: "lib/propostas/modelos/importar.ts",
+    sintomaDeFalha:
+      "O botão de criar modelo a partir de um arquivo não devolve nada, e a pessoa monta o modelo seção por seção à mão.",
+    registraEm: "llm_calls",
+  },
+  {
     id: "bot_respond",
     rotulo: "Responder (motor antigo)",
     oQueFaz:
@@ -267,6 +303,11 @@ export const PONTOS_DE_IA: readonly PontoDeIa[] = [
     sintomaDeFalha:
       "A conversa cai sempre no mesmo agente, ou em nenhum — como se os roteadores que você configurou não existissem.",
     registraEm: "llm_calls",
+    decisaoRapida: {
+      primitiva: "choice",
+      oQueOJevFaz:
+        "Lê a última mensagem do cliente, sozinha, e escolhe entre as intenções do seu roteador qual agente deve atender.",
+    },
   },
   {
     id: "stage_classifier",
@@ -364,6 +405,11 @@ export const PONTOS_DE_IA: readonly PontoDeIa[] = [
     sintomaDeFalha:
       "O agente passa a aceitar instruções de estranhos e pode falar em nome da empresa coisas que você nunca autorizou.",
     registraEm: "llm_calls",
+    decisaoRapida: {
+      primitiva: "choice",
+      oQueOJevFaz:
+        "Percebe, na mensagem do cliente, quem tenta enganar o agente para ele fugir das suas regras — e soma esse sinal ao da sua IA de sempre, sem nunca apagá-lo.",
+    },
   },
   {
     id: "promise_semantic",
@@ -572,9 +618,6 @@ export const PONTOS_DE_IA: readonly PontoDeIa[] = [
 export const PONTO_POR_ID: ReadonlyMap<string, PontoDeIa> = new Map(
   PONTOS_DE_IA.map((p) => [p.id, p]),
 );
-
-/** Onde o Jev trabalha: o cartão dele lista, e a chave dele diz "Usada em". */
-export const PONTOS_DO_JEV: readonly PontoDeIa[] = PONTOS_DE_IA.filter((p) => p.decisaoRapida);
 
 /**
  * Os pontos agrupados como a tela mostra. A ordem dentro de cada papel é a de
