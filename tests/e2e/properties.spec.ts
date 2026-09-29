@@ -162,15 +162,7 @@ test.describe("módulo de imóveis — fluxo completo", () => {
 
       // --- 2. Criar um lead novo no pipeline seedado e abrir o dossiê ---
       await page.goto(`${APP_URL}/app/pipelines/${creds.kanban!.pipeline_id}`);
-      // O seletor de contato do diálogo busca a lista ao abrir, e quando ela
-      // chega o formulário cresce e empurra o botão "Criar lead" para baixo.
-      // Visto na v1.61.0: a lista chegou 90 ms antes do clique, o clique caiu
-      // onde o botão ESTAVA, e nenhum POST saiu. Esperar a lista tira a corrida.
-      const contatosDoSeletor = page.waitForResponse(
-        (r) => r.url().includes("/api/v1/contacts") && r.request().method() === "GET",
-      );
       await page.getByRole("button", { name: "Novo Lead" }).click();
-      await contatosDoSeletor;
       const newLeadDialog = page.getByRole("dialog").filter({ hasText: "Novo Lead" });
       await expect(newLeadDialog).toBeVisible();
       await newLeadDialog.locator("#title").fill(leadTitle);
