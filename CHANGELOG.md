@@ -8,6 +8,19 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
 ## [Não lançado]
 
+## [1.73.0-sb.1] — 2026-10-05
+
+### Corrigido
+
+- **Esta instalação acompanha a versão 1.73.0 do projeto de origem** As doze versões publicadas pelo projeto de origem desde a 1.61.0 entram aqui
+  de uma vez, com o que cada uma trouxe listado logo abaixo. A janela de
+  rajada que cada agente passa a poder escolher continua deslizando a cada
+  mensagem até o teto desta instalação, então quem escreve em várias bolhas
+  segue recebendo uma resposta só. Falha de rotina agendada passa a aparecer
+  no log do scheduler sem perder o espaçamento entre as rotinas. E a tela de
+  contatos duplicados continua restrita a gerente e admin, porque o
+  agrupamento é feito pelo telefone.
+
 ## [1.73.0] — 2026-10-05
 
 ### Adicionado
