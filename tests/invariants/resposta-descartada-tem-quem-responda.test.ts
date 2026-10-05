@@ -116,7 +116,7 @@ async function despacharPeloDrain(msgId: string): Promise<void> {
   try {
     await m.drainTick(
       pool,
-      { batchSize: 20, intervalMs: 100, idleIntervalMs: 100, debounceMs: 0, reapTimeoutMs: 300_000 },
+      { batchSize: 20, intervalMs: 100, idleIntervalMs: 100, debounceMs: 0, debounceTetoMs: 40_000, reapTimeoutMs: 300_000 },
       m.createLogger(),
     );
   } finally {

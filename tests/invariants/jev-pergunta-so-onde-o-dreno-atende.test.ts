@@ -49,6 +49,9 @@ const DRAIN_KNOBS = {
   intervalMs: 100,
   idleIntervalMs: 100,
   debounceMs: 0,
+  // Desta casa (issue #196): obrigatório em `DrainKnobs`. Inerte aqui, com
+  // `debounceMs: 0`.
+  debounceTetoMs: 40_000,
   reapTimeoutMs: 300_000,
 };
 

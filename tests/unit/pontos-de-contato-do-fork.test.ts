@@ -185,6 +185,13 @@ const CONTATOS: Contato[] = [
       "reponha `requireRole(\"manager\", ...)` no GET. O upstream libera para viewer via `orgAtivaDaApi`, e a `chave` do agrupamento é o telefone normalizado: mascarar campo não adianta. Ajuste junto o controle positivo de tests/unit/api-nao-redireciona-org-suspensa.test.ts (19 nesta casa).",
   },
   {
+    arquivo: "scripts/conferir-isolamento-do-kit.sh",
+    marca: "https://github.com/melgarafael/DeskcommCRM.git",
+    oQueE: "a tag fixa v1.63.0 buscada no upstream quando o origin não a tem",
+    seSumir:
+      "reponha o `|| git fetch ... https://github.com/melgarafael/DeskcommCRM.git` em `update_sh_da`. O origin daqui só publica tags `-sb`, e sem o segundo endereço o job invariants reprova em \"couldn't find remote ref refs/tags/v1.63.0\".",
+  },
+  {
     arquivo: "tests/unit/api-nao-redireciona-org-suspensa.test.ts",
     marca: ".toBeGreaterThanOrEqual(19)",
     oQueE: "o controle positivo da cerca de org suspensa, um a menos pela rota de duplicados",

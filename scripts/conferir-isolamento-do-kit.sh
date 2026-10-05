@@ -86,7 +86,11 @@ update_sh_da() {  # update_sh_da <tag> — caminho de uma cópia do update.sh da
   if ! git -C "$ROOT" rev-parse -q --verify "refs/tags/$1^{commit}" >/dev/null; then
     local profundidade=""
     [ "$(git -C "$ROOT" rev-parse --is-shallow-repository)" = true ] && profundidade="--depth=1"
-    git -C "$ROOT" fetch -q --no-tags $profundidade origin "+refs/tags/$1:refs/tags/$1"
+    # ⚠️ DESTA CASA: o `origin` deste repositório só publica as tags `-sb`, e a
+    # `v1.63.0` fixa é do upstream. Sem o segundo endereço a busca morre em
+    # "couldn't find remote ref" e a conferência reprova sem ter rodado.
+    git -C "$ROOT" fetch -q --no-tags $profundidade origin "+refs/tags/$1:refs/tags/$1" 2>/dev/null \
+      || git -C "$ROOT" fetch -q --no-tags $profundidade https://github.com/melgarafael/DeskcommCRM.git "+refs/tags/$1:refs/tags/$1"
   fi
   git -C "$ROOT" show "$1:hostgator-setup-kit/update.sh" > "$TMP/$1"
   printf '%s' "$TMP/$1"

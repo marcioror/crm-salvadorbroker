@@ -79,6 +79,10 @@ const CONTATO_LINHA = {
   updated_at: "2026-01-01T10:00:00.000Z",
   last_activity_at: null,
   first_service_at: null,
+  // Desta casa (proteção de contato): o tipo `Contact` carrega quem cadastrou
+  // e se o telefone/e-mail saíram mascarados.
+  created_by_user_id: null,
+  contact_protected: false,
 } satisfies Contact;
 
 /** Onde a contagem enxerga: ficha existente e agenda desta organização. */

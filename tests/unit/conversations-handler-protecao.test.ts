@@ -98,8 +98,9 @@ describe("listConversationsHandler — proteção do telefone embutido", () => {
       // `comando` entrou na v1.16 (migration 0203, "comando da conversa") e,
       // como `status`, é um `.transform()`: a saída do zod infere a chave como
       // OBRIGATÓRIA podendo valer `undefined` — diferente de `.optional()`.
-      // Omitir não compila. Mesma pegadinha da fusão de 2026-08-26.
-      { status: undefined, comando: undefined, limit: 20 },
+      // Omitir não compila. Mesma pegadinha da fusão de 2026-08-26, e de novo
+      // com `tag` na v1.73.0.
+      { status: undefined, comando: undefined, tag: undefined, limit: 20 },
     );
     const conv = result.conversations[0] as unknown as { contacts: { phone_number: string | null; contact_protected: boolean } };
     expect(conv.contacts.phone_number).toBeNull();
@@ -114,8 +115,9 @@ describe("listConversationsHandler — proteção do telefone embutido", () => {
       // `comando` entrou na v1.16 (migration 0203, "comando da conversa") e,
       // como `status`, é um `.transform()`: a saída do zod infere a chave como
       // OBRIGATÓRIA podendo valer `undefined` — diferente de `.optional()`.
-      // Omitir não compila. Mesma pegadinha da fusão de 2026-08-26.
-      { status: undefined, comando: undefined, limit: 20 },
+      // Omitir não compila. Mesma pegadinha da fusão de 2026-08-26, e de novo
+      // com `tag` na v1.73.0.
+      { status: undefined, comando: undefined, tag: undefined, limit: 20 },
     );
     const conv = result.conversations[0] as unknown as { contacts: { phone_number: string | null } };
     expect(conv.contacts.phone_number).toBe("+5531988887777");
