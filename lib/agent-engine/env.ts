@@ -146,6 +146,11 @@ const envSchema = z.object({
   // o que impede um contato que escreve sem parar de adiar a resposta para
   // sempre. Default 40s = cinco janelas de 8s.
   INBOUND_DEBOUNCE_MAX_MS: z.coerce.number().int().min(0).default(40_000),
+  // Resposta obsoleta: o cliente escreveu de novo enquanto o turno pensava → a
+  // resposta desatualizada não sai e o turno seguinte responde a tudo junto,
+  // enquanto a mensagem mais antiga sem resposta tiver menos que isto. 0 = desliga.
+  // Ver `respostaFicouObsoleta` (agent/turno-ja-respondido.ts).
+  RESPOSTA_OBSOLETA_TETO_MS: z.coerce.number().int().min(0).default(120_000),
   // Circuito de saúde do número — ritmo do ticker (block/response rate por número).
   NUMBER_HEALTH_INTERVAL_MS: z.coerce.number().int().positive().default(300_000),
   // Cron persistente por contato — knobs, nunca constantes.

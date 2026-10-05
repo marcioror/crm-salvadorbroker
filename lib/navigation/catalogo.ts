@@ -895,6 +895,20 @@ const NAV_CATALOG_BASE = [
     minRole: "manager",
   },
   {
+    // A área única dos recursos opcionais (pedido do mantenedor, doc 73/80):
+    // tudo o que a empresa pode ligar, com o estado e o caminho até a tela onde
+    // se liga. Só leitura — quem liga continua sendo a tela do assunto.
+    href: "/app/settings/recursos",
+    label: "Recursos opcionais",
+    description: "Tudo o que se liga e desliga, se está ligado e onde se ajusta.",
+    icon: "ListChecks",
+    group: "organizacao",
+    section: "Sua empresa",
+    // `manager`: o gerente decide metade das chaves da lista. Atendente e
+    // leitor não ajustam nenhuma, e a tela redireciona os dois para /403.
+    minRole: "manager",
+  },
+  {
     href: "/app/settings/tenant",
     label: "Organização",
     description: "Dados da empresa, retenção de dados e encarregado de LGPD.",

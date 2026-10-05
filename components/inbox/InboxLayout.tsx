@@ -139,12 +139,24 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
   const searchParams = useSearchParams();
   const tab = parseFilterParam(searchParams.get("filter"));
   const idNaUrl = searchParams.get("id");
+  /**
+   * `?tag=` é o destino do link de cada linha do relatório Por etiqueta
+   * (#1891): a lista nasce filtrada pelo marcador escolhido lá. Sem esta
+   * leitura o link abriria o Inbox SEM filtrar nada — um link que promete
+   * conversa e entrega caixa de entrada inteira.
+   *
+   * Uma etiqueta só: o filtro de VÁRIAS (#1886) é o da própria tela, e uma
+   * query repetida aqui não teria como distinguir E de OU no seletor.
+   */
+  const tagNaUrl = searchParams.get("tag");
 
-  // tab vive na URL (?filter=); os demais filtros são estado local de sessão.
+  // tab vive na URL (?filter=); os demais filtros são estado local de sessão —
+  // exceto a etiqueta, que entra UMA vez, na abertura, pela URL.
   const [aux, setAux] = useState<Omit<InboxFiltersValue, "tab">>({
     search: "",
     onlyUnread: false,
     onlyGroups: false,
+    ...(tagNaUrl ? { tag: tagNaUrl } : {}),
   });
   const filterValue: InboxFiltersValue = { tab, ...aux };
   const setFilterValue = useCallback(
@@ -234,6 +246,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
         : undefined,
       channel_session_id: filterValue.channel_session_id,
       tag: filterValue.tag,
+      tagMode: filterValue.tagMode,
       unread: filterValue.onlyUnread || undefined,
       is_group: filterValue.onlyGroups || undefined,
     }),
@@ -243,6 +256,7 @@ export function InboxLayout({ initialSelectedId = null, rascunho = null }: Inbox
       filterValue.search,
       filterValue.channel_session_id,
       filterValue.tag,
+      filterValue.tagMode,
       filterValue.onlyUnread,
       filterValue.onlyGroups,
     ],

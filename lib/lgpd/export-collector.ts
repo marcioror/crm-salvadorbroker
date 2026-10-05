@@ -73,6 +73,15 @@ export interface MessageRow {
   status: string;
   body: string | null;
   has_media: boolean;
+  /**
+   * Transcrição do áudio / texto extraído da mídia (OCR de imagem) que a IA
+   * leu (migration 0497). A anonimização o APAGA quando o titular pede
+   * eliminação (#1989/#1990); o Art. 18 II exige o oposto — quem pede os
+   * próprios dados recebe o texto que a organização leu da mídia dele. O
+   * binário nunca vai no pacote (só `has_media`); sem esta coluna o export não
+   * trazia nem o texto que a IA efetivamente processou.
+   */
+  media_derived_text: string | null;
   sent_at: string | null;
   created_at: string;
 }
@@ -655,6 +664,27 @@ export interface ExportPayload {
     consumed_at: string | null;
     created_at: string;
   }>;
+  /**
+   * Notas internas das conversas do titular (#1863, F3) — o texto que a equipe
+   * escreveu SOBRE ele e a mídia que anexou junto. Sem FK para `contacts` (só
+   * para `conversations`), nenhuma outra leitura alcançaria a tabela; é o mesmo
+   * motivo de `conversation_drafts`. A migration 0483 redige `body`, zera
+   * `media_storage_path`/`media_mime`/`media_size_bytes` e enfileira o arquivo
+   * com o bucket `internal-media` quando ele pede anonimização — o que se apaga
+   * a pedido dele é o que se entrega a pedido dele (Art. 18 II). A mídia vem
+   * como METADADO (caminho, MIME, bytes): o export é `data.json` + `report.pdf`,
+   * e nenhum binário trafega por ele.
+   */
+  conversation_notes?: Array<{
+    id: string;
+    conversation_id: string;
+    body: string;
+    media_storage_path: string | null;
+    media_mime: string | null;
+    media_size_bytes: number | null;
+    created_at: string;
+    created_by_name: string | null;
+  }>;
   /** Propostas de campo do contato (0123), também APAGADAS na anonimização. */
   contact_field_proposals?: Array<{
     id: string;
@@ -667,6 +697,42 @@ export interface ExportPayload {
     proposed_at: string;
     decided_at: string | null;
     motivo_recusa: string | null;
+  }>;
+  /**
+   * Memória da IA sobre o titular (#1957): `lead_notes` guarda `headline` +
+   * `body` — o nome e trechos do que a pessoa escreveu. A cascata redige os
+   * dois quando ele pede anonimização; o que se apaga a pedido dele é o que se
+   * entrega a pedido dele (Art. 18 II). Mesmo escopo da cascata: org + contato.
+   */
+  lead_notes?: Array<{
+    id: string;
+    headline: string | null;
+    body: string | null;
+    created_at: string | null;
+    updated_at: string | null;
+  }>;
+  /**
+   * Registro de execução da IA (#1957): de `ai_agent_runs.tool_calls` (jsonb)
+   * saem só o nome e os argumentos de cada ferramenta — nome do titular e
+   * trechos do que escreveu. O `result` e o texto do passo ficam de fora
+   * (podem trazer dado de OUTROS contatos; ver `toolCallsParaOTitular`).
+   * Redigido na cascata; entregue no acesso. Org + contato.
+   */
+  ai_agent_runs?: Array<{
+    id: string;
+    tool_calls: unknown;
+    created_at: string | null;
+  }>;
+  /**
+   * Estado da lead (#1957): `lead_state.next_action` (texto) e `qualification`
+   * (jsonb) descrevem o titular por máquina. Redigidos na cascata; entregues
+   * no acesso. Org + contato.
+   */
+  lead_state?: Array<{
+    id: string;
+    next_action: string | null;
+    qualification: unknown;
+    updated_at: string | null;
   }>;
   /**
    * Empresas e pessoas (migrations 0448/0449, metade B2B do #1621): a PESSOA
@@ -792,6 +858,41 @@ async function lerControlador(
     dpo_email: data.dpo_email?.trim() || dpoDaInstalacao,
     country: (data as { country?: string | null }).country ?? null,
   };
+}
+
+/**
+ * O que o titular recebe de `ai_agent_runs.tool_calls` (#1965): por passo, o
+ * nome e os argumentos de cada ferramenta — o que o agente fez com o que a
+ * pessoa escreveu. Saem o `result` de cada chamada e o `text` do passo (forma
+ * em `lib/ai/runtime/serialize.ts`): o `result` de `crm_search_contacts` traz
+ * nome, telefone e e-mail de até 50 OUTROS contatos, e o de
+ * `crm_list_appointments` a agenda da organização — entregá-los seria dar ao
+ * titular A o dado do titular B. O texto do modelo pode repetir esse resultado.
+ * Passo já redigido pela cascata (`redacted: true`, sem `args`) sai como está.
+ */
+export function toolCallsParaOTitular(toolCalls: unknown): unknown[] {
+  const passos = Array.isArray(toolCalls) ? (toolCalls as unknown[]) : [];
+  return passos.map((p) => {
+    const passo = (p ?? {}) as {
+      step?: unknown;
+      tool_name?: unknown;
+      redacted?: unknown;
+      tool_calls?: unknown;
+    };
+    const chamadas = Array.isArray(passo.tool_calls) ? (passo.tool_calls as unknown[]) : [];
+    return {
+      ...(passo.step !== undefined ? { step: passo.step } : {}),
+      ...(typeof passo.tool_name === "string" ? { tool_name: passo.tool_name } : {}),
+      ...(passo.redacted === true ? { redacted: true } : {}),
+      tool_calls: chamadas.map((c) => {
+        const chamada = (c ?? {}) as { tool_name?: unknown; args?: unknown };
+        return {
+          tool_name: typeof chamada.tool_name === "string" ? chamada.tool_name : "unknown",
+          ...(chamada.args !== undefined ? { args: chamada.args } : {}),
+        };
+      }),
+    };
+  });
 }
 
 export async function collectExportData(args: CollectArgs): Promise<ExportPayload> {
@@ -977,7 +1078,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
 
     const { data, error } = await admin
       .from("messages")
-      .select("id, conversation_id, direction, type, status, body, media_url, sent_at, created_at")
+      .select("id, conversation_id, direction, type, status, body, media_url, media_derived_text, sent_at, created_at")
       .eq("organization_id", organizationId)
       .eq("contact_id", contactId)
       .order("created_at", { ascending: false })
@@ -996,6 +1097,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
         status: m.status,
         body: m.body,
         has_media: Boolean(m.media_url),
+        media_derived_text: m.media_derived_text ?? null,
         sent_at: m.sent_at,
         created_at: m.created_at,
       }));
@@ -1399,7 +1501,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     if (!busca) continue;
     const { data, error } = await admin
       .from("messages")
-      .select("id, conversation_id, direction, type, status, body, media_url, sent_at, created_at")
+      .select("id, conversation_id, direction, type, status, body, media_url, media_derived_text, sent_at, created_at")
       .eq("organization_id", organizationId)
       .in(busca.campo, busca.valores)
       .order("created_at", { ascending: false })
@@ -1420,6 +1522,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
         status: m.status,
         body: m.body,
         has_media: Boolean(m.media_url),
+        media_derived_text: m.media_derived_text ?? null,
         sent_at: m.sent_at,
         created_at: m.created_at,
       });
@@ -1541,6 +1644,73 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
       if (!data || data.length < 500) break;
     }
   }
+  // Memória da IA, registros de execução e estado da lead — o que a cascata
+  // (#1957) redige a pedido de eliminação, e que o acesso entrega de volta.
+  //
+  // as três têm `contact_id` + `organization_id` na própria linha, então o
+  // escopo sai do mesmo `eq` que a cascata usa — sem depender de derivação
+  // por conversa ou lead. `lead_state.qualification` sai íntegro; de
+  // `ai_agent_runs.tool_calls` saem os argumentos, não o resultado das
+  // ferramentas, que pode trazer dado de outras pessoas (`toolCallsParaOTitular`).
+  const lead_notes: NonNullable<ExportPayload["lead_notes"]> = [];
+  const ai_agent_runs: NonNullable<ExportPayload["ai_agent_runs"]> = [];
+  const lead_state: NonNullable<ExportPayload["lead_state"]> = [];
+  if (contactId) {
+    // A tabela entra por `.from("<nome>")` literal em quem chama, não por
+    // parâmetro: `tests/unit/lgpd-exporta-o-que-redige.test.ts` só reconhece a
+    // tabela exportada pelo literal, e um `.from(tabela)` a deixava invisível.
+    const lePaginado = async (
+      pagina: (
+        de: number,
+        ate: number,
+      ) => PromiseLike<{ data: unknown[] | null; error: unknown }>,
+    ): Promise<Record<string, unknown>[]> => {
+      const linhas: Record<string, unknown>[] = [];
+      for (let offset = 0; ; offset += 500) {
+        const { data, error } = await pagina(offset, offset + 499);
+        if (error) throw error;
+        linhas.push(...((data ?? []) as unknown as Record<string, unknown>[]));
+        if (!data || data.length < 500) break;
+      }
+      return linhas;
+    };
+    for (const nota of await lePaginado((de, ate) =>
+      admin
+        .from("lead_notes")
+        .select("id, headline, body, created_at, updated_at")
+        .eq("organization_id", organizationId)
+        .eq("contact_id", contactId)
+        .order("id")
+        .range(de, ate),
+    )) {
+      lead_notes.push(nota as NonNullable<ExportPayload["lead_notes"]>[number]);
+    }
+    for (const run of await lePaginado((de, ate) =>
+      admin
+        .from("ai_agent_runs")
+        .select("id, tool_calls, created_at")
+        .eq("organization_id", organizationId)
+        .eq("contact_id", contactId)
+        .order("id")
+        .range(de, ate),
+    )) {
+      ai_agent_runs.push({
+        ...(run as NonNullable<ExportPayload["ai_agent_runs"]>[number]),
+        tool_calls: toolCallsParaOTitular(run.tool_calls),
+      });
+    }
+    for (const estado of await lePaginado((de, ate) =>
+      admin
+        .from("lead_state")
+        .select("id, next_action, qualification, updated_at")
+        .eq("organization_id", organizationId)
+        .eq("contact_id", contactId)
+        .order("id")
+        .range(de, ate),
+    )) {
+      lead_state.push(estado as NonNullable<ExportPayload["lead_state"]>[number]);
+    }
+  }
   // Casos, linha do tempo do caso e demandas — o que a 0280 pôs na cascata.
   //
   // O escopo do CASO é a CONVERSA do titular: `agent_cases` não tem FK para
@@ -1555,6 +1725,7 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
   const passagens: PassagemDeAtendimentoRow[] = [];
   const avisos_de_caso: AvisoDeCasoEntregaRow[] = [];
   const conversation_drafts: NonNullable<ExportPayload["conversation_drafts"]> = [];
+  const conversation_notes: NonNullable<ExportPayload["conversation_notes"]> = [];
   if (contactId) {
     const pageSize = 500;
     const refBatchSize = 100; // Mantém o filtro IN abaixo dos limites de URL dos proxies.
@@ -1702,6 +1873,31 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
           .range(offset, offset + pageSize - 1);
         if (error) throw error;
         conversation_drafts.push(...(data ?? []));
+        if (!data || data.length < pageSize) break;
+      }
+    }
+    // As NOTAS INTERNAS das conversas do titular (migration 0483) — MESMO
+    // escopo dos rascunhos, pelos mesmos ids já paginados: `conversation_notes`
+    // não tem FK para `contacts`, e sem este bloco o Art. 18 II entregaria um
+    // relatório que omita o que a equipe anotou sobre a pessoa. É a outra
+    // metade do par que `tests/unit/lgpd-exporta-o-que-redige.test.ts` deriva
+    // da fonte (a cascata 0483 passa a redigir esta tabela) e reprova quem
+    // redige e não exporta. A mídia entra como metadado — caminho, MIME e
+    // bytes — porque o export é `data.json` + `report.pdf`.
+    for (let batch = 0; batch < conversationIds.length; batch += refBatchSize) {
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await admin
+          .from("conversation_notes")
+          // Literal, sem concatenação: o supabase-js lê as colunas do TIPO da
+          // string para inferir a linha, e string montada volta como
+          // `GenericStringError` e não compila (mesma pegadinha logo acima).
+          .select("id, conversation_id, body, media_storage_path, media_mime, media_size_bytes, created_at, created_by_name")
+          .eq("organization_id", organizationId)
+          .in("conversation_id", conversationIds.slice(batch, batch + refBatchSize))
+          .order("id")
+          .range(offset, offset + pageSize - 1);
+        if (error) throw error;
+        conversation_notes.push(...(data ?? []));
         if (!data || data.length < pageSize) break;
       }
     }
@@ -1871,7 +2067,11 @@ export async function collectExportData(args: CollectArgs): Promise<ExportPayloa
     channel_session_groups,
     group_messages_authored,
     conversation_drafts,
+    conversation_notes,
     contact_field_proposals,
+    lead_notes,
+    ai_agent_runs,
+    lead_state,
     b2b,
   };
 }
@@ -1922,5 +2122,8 @@ function emptyPayload(
     campaign_suppressions: [],
     channel_session_groups: [],
     group_messages_authored: [],
+    lead_notes: [],
+    ai_agent_runs: [],
+    lead_state: [],
   };
 }

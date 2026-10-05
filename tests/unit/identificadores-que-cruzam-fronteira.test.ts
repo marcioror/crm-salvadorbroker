@@ -163,6 +163,12 @@ const SITES: { arquivo: string; fronteira: string; papel?: "gerador" | "validado
   { arquivo: "workers/lgpd-export-worker.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "workers/media-persist-worker.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "lib/ai/skills/install.ts", fronteira: "storage.chave-de-objeto" },
+  // Herança de arquivos do pacote no save textual (#2047): a chave é montada
+  // com os MESMOS pedaços do install — org (uuid do JWT), name (vem da
+  // skill_version já instalada, não do payload) e versionId (uuid do INSERT) —
+  // e o sufixo é o path que o .zip passou pela validação de alfabeto do
+  // package.ts. Nada de texto digitado pelo operador entra na chave.
+  { arquivo: "lib/ai/skills/package-files.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/products/[id]/fotos/route.ts", fronteira: "storage.chave-de-objeto" },
   // ⚠️ DESTE FORK (módulo de imóveis): `<org>/<imóvel>/photo-<uuid>.<ext>`, três uuids.
   { arquivo: "app/api/v1/properties/[id]/media/route.ts", fronteira: "storage.chave-de-objeto" },
@@ -171,6 +177,9 @@ const SITES: { arquivo: string; fronteira: string; papel?: "gerador" | "validado
   { arquivo: "app/api/v1/settings/sons/route.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/marca/logo/route.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/conversations/[id]/media/route.ts", fronteira: "storage.chave-de-objeto" },
+  // O anexo da nota interna (#1863, F3): MESMO molde de chave da rota irmã
+  // (`{org}/{conversa}/note-{uuid}.{ext}`), bucket próprio `internal-media`.
+  { arquivo: "app/api/v1/conversations/[id]/notes/media/route.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/ai/knowledge/sources/upload/route.ts", fronteira: "storage.chave-de-objeto" },
   { arquivo: "app/api/v1/ai/knowledge/sources/route.ts", fronteira: "storage.chave-de-objeto" },
   // O PDF da proposta comercial (#1832): `<org>/<proposta>.pdf`, dois uuids.

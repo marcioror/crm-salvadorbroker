@@ -183,15 +183,30 @@ echo "$CRONS" | while IFS='|' read -r quando timeout rota; do
   [ -n "$rota" ] || continue
   atraso=$(( i % 41 ))
   i=$(( i + 1 ))
-  # `sleep 0` seria inofensivo, mas a primeira linha sem prefixo nenhum deixa
-  # óbvio, para quem lê o crontab dentro do contêiner, que o atraso é acréscimo
-  # e não parte do contrato.
+  # `>/dev/null` só no STDOUT: o corpo da resposta é grande e não interessa aqui.
+  # O STDERR era o que a redireção antiga (`>/dev/null 2>&1`) engolia junto — e
+  # foi ali que a issue #1109 ficou seis versões invisível: o `sync-model-catalog`
+  # tomava 401 do scheduler todo dia, o `curl -f` saía diferente de zero e o
+  # crontab descartava saída E erro, então o catálogo ficava vazio sem que
+  # ninguém visse um sintoma. Agora o status continua no STDERR do `curl -fsS`
+  # (é o `-S` que o imprime) e, quando o comando falha, a linha acrescenta uma
+  # frase dizendo qual rota falhou e o que conferir — os dois no STDERR, que o
+  # `crond -f` entrega ao `docker logs` do scheduler. Em rodada saudável não há
+  # uma linha a mais: o `||` só dispara em falha.
+  # % é proibido aqui (crontab de vixie trata como início de stdin) e `$`/crase
+  # seriam reavaliados pelo sh do crond — nenhum dos dois aparece na mensagem.
+  #
+  # O atraso escalonado é DESTA CASA (ver o bloco acima do laço). `sleep 0`
+  # seria inofensivo, mas a primeira linha sem prefixo nenhum deixa óbvio, para
+  # quem lê o crontab dentro do contêiner, que o atraso é acréscimo e não parte
+  # do contrato. Com o prefixo, o `;` separa o `sleep` e o `||` continua
+  # pegando só o curl: o aviso de falha é dele, nunca do `sleep`.
   if [ "$atraso" -eq 0 ]; then
-    printf '%s curl -fsS -m%s -H '"'"'Authorization: Bearer %s'"'"' "%s/%s" >/dev/null 2>&1\n' \
-      "$quando" "$timeout" "$SEGREDO_SEGURO" "$APP_ORIGIN" "$rota" >> "$DESTINO"
+    printf '%s curl -fsS -m%s -H '"'"'Authorization: Bearer %s'"'"' "%s/%s" >/dev/null || echo "deskcomm-cron: FALHOU %s — veja o erro do curl logo acima; se for 401 ou 403, o segredo que este scheduler manda não é o que o app enxerga: confira INTERNAL_SECRET/INTERNAL_CRON_SECRET no .env e rode docker compose up -d --force-recreate app scheduler" >&2\n' \
+      "$quando" "$timeout" "$SEGREDO_SEGURO" "$APP_ORIGIN" "$rota" "$rota" >> "$DESTINO"
   else
-    printf '%s sleep %s; curl -fsS -m%s -H '"'"'Authorization: Bearer %s'"'"' "%s/%s" >/dev/null 2>&1\n' \
-      "$quando" "$atraso" "$timeout" "$SEGREDO_SEGURO" "$APP_ORIGIN" "$rota" >> "$DESTINO"
+    printf '%s sleep %s; curl -fsS -m%s -H '"'"'Authorization: Bearer %s'"'"' "%s/%s" >/dev/null || echo "deskcomm-cron: FALHOU %s — veja o erro do curl logo acima; se for 401 ou 403, o segredo que este scheduler manda não é o que o app enxerga: confira INTERNAL_SECRET/INTERNAL_CRON_SECRET no .env e rode docker compose up -d --force-recreate app scheduler" >&2\n' \
+      "$quando" "$atraso" "$timeout" "$SEGREDO_SEGURO" "$APP_ORIGIN" "$rota" "$rota" >> "$DESTINO"
   fi
 done
 
