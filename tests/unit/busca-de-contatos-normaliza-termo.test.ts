@@ -232,7 +232,10 @@ describe("busca de contatos: o termo é normalizado pela régua do repo (#1835, 
     // aninharia, e cada vírgula restante tem de ser a que o handler pôs.
     expect(filtro).not.toMatch(/[()]/);
     const colunas = filtro.split(",").map((cond) => cond.split(".")[0]);
-    expect(colunas).toEqual(["name", "display_name", "email", "phone_number"]);
+    // ⚠️ DESTA CASA: o ator aqui é `user` sem papel, e a proteção de contato
+    // tira `email` e `phone_number` do OR de quem não é manager (buscar por eles
+    // confirmaria o dado protegido). No upstream são quatro colunas.
+    expect(colunas).toEqual(["name", "display_name"]);
     // O recorte por organização é parâmetro PRÓPRIO da query (E com o `or=`):
     // é ele que segura o caminho de service role (Bearer e MCP).
     expect(igualdades).toContainEqual(["organization_id", ORG]);

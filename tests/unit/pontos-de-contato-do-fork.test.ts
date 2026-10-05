@@ -192,6 +192,20 @@ const CONTATOS: Contato[] = [
       "reponha o `|| git fetch ... https://github.com/melgarafael/DeskcommCRM.git` em `update_sh_da`. O origin daqui só publica tags `-sb`, e sem o segundo endereço o job invariants reprova em \"couldn't find remote ref refs/tags/v1.63.0\".",
   },
   {
+    arquivo: "tests/unit/busca-de-contatos-normaliza-termo.test.ts",
+    marca: 'expect(colunas).toEqual(["name", "display_name"]);',
+    oQueE: "o teste de injeção na busca medindo o OR sem telefone e e-mail",
+    seSumir:
+      "o upstream espera quatro colunas porque não tem o portão `podeBuscarPorDadoSensivel` de contacts/_handler.ts. Com ator sem papel, aqui são só `name` e `display_name`; não ponha o telefone de volta no OR para o teste passar.",
+  },
+  {
+    arquivo: "supabase/local/imoveis.sql",
+    marca: "public.fn_is_platform_admin_full()",
+    oQueE: "a escrita de imóveis fechada ao suporte só leitura",
+    seSumir:
+      "a policy `_agent_write` de properties e properties_media volta a usar `fn_is_platform_admin_full()`. Com a função pura, o escopo `support_readonly` escreve no cadastro, e o invariante platform-admin-full-so-escreve reprova.",
+  },
+  {
     arquivo: "tests/unit/api-nao-redireciona-org-suspensa.test.ts",
     marca: ".toBeGreaterThanOrEqual(19)",
     oQueE: "o controle positivo da cerca de org suspensa, um a menos pela rota de duplicados",

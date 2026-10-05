@@ -229,6 +229,8 @@ contato "lib/crm-b2b/people-handler.ts" "protegerContato(c, ctx.actor)" "a prote
 contato "components/kanban/NewLeadDialog.tsx" 'className="max-h-[90vh] overflow-y-auto"' "o diálogo de lead novo que cabe numa tela de 720 px"
 contato "app/api/v1/contacts/duplicates/route.ts" 'requireRole("manager"' "o gate manager na lista de duplicados"
 contato "scripts/conferir-isolamento-do-kit.sh" "https://github.com/melgarafael/DeskcommCRM.git" "a tag fixa v1.63.0 buscada no upstream"
+contato "tests/unit/busca-de-contatos-normaliza-termo.test.ts" 'expect(colunas).toEqual(["name", "display_name"]);' "o teste de injeção na busca sem telefone no OR"
+contato "supabase/local/imoveis.sql" "public.fn_is_platform_admin_full()" "a escrita de imóveis fechada ao suporte só leitura"
 contato "tests/unit/api-nao-redireciona-org-suspensa.test.ts" ".toBeGreaterThanOrEqual(19)" "o controle positivo da cerca de org suspensa"
 contato "lib/reports/atividades.ts" "podeVerContatoSensivel" "a proteção no relatório de atividades"
 contato "lib/leads/nascimento-do-lead.ts" "nomeDoContato(contato)" "o título do lead que não grava telefone"
