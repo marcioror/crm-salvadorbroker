@@ -178,6 +178,20 @@ const CONTATOS: Contato[] = [
       "reponha a classe no `DialogContent`. Sem ela, com a lista do seletor de contato aberta, o botão \"Criar lead\" fica fora da tela e o properties.spec reprova em waitForResponse. Se o upstream corrigir do jeito dele, este ponto sai.",
   },
   {
+    arquivo: "app/api/v1/contacts/duplicates/route.ts",
+    marca: 'requireRole("manager"',
+    oQueE: "o gate manager na lista de duplicados, cuja chave é o telefone",
+    seSumir:
+      "reponha `requireRole(\"manager\", ...)` no GET. O upstream libera para viewer via `orgAtivaDaApi`, e a `chave` do agrupamento é o telefone normalizado: mascarar campo não adianta. Ajuste junto o controle positivo de tests/unit/api-nao-redireciona-org-suspensa.test.ts (19 nesta casa).",
+  },
+  {
+    arquivo: "tests/unit/api-nao-redireciona-org-suspensa.test.ts",
+    marca: ".toBeGreaterThanOrEqual(19)",
+    oQueE: "o controle positivo da cerca de org suspensa, um a menos pela rota de duplicados",
+    seSumir:
+      "se o upstream subir o número, desconte a rota `contacts/duplicates`, que nesta casa usa `requireRole(\"manager\")` e não `orgAtivaDaApi`.",
+  },
+  {
     arquivo: "lib/reports/atividades.ts",
     marca: "podeVerContatoSensivel",
     oQueE: "a proteção no relatório de atividades",
