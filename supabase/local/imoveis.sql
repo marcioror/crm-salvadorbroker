@@ -97,6 +97,13 @@ on conflict (id) do update set file_size_limit = excluded.file_size_limit;
 -- Mesmo defeito da 0150 (8 tabelas) e da 0143; estas ficaram de fora por serem
 -- deste fork. Forma canônica: SELECT org-flat + escrita com fn_role_at_least.
 -- As permissivas se somam por OR, então a org-flat PRECISA sair junto.
+--
+-- Na escrita, o admin da plataforma é `fn_is_platform_admin_full()`, e não a
+-- função pura: a pura também vale para o escopo `support_readonly`, que assim
+-- escrevia no cadastro de imóveis. É o mesmo conserto que o upstream fez nas
+-- tabelas dele (#2115, migration 0533), e a cerca
+-- `tests/invariants/platform-admin-full-so-escreve.test.ts` conta toda policy
+-- de escrita de `public`, inclusive estas. A leitura continua com a pura.
 do $$
 declare t text;
 begin
@@ -116,12 +123,12 @@ begin
     execute format(
       'create policy %s_agent_write on public.%I
          using (
-           public.fn_is_platform_admin()
+           public.fn_is_platform_admin_full()
            or ((organization_id in (select * from public.fn_user_org_ids()))
                and public.fn_role_at_least(organization_id, ''agent''))
          )
          with check (
-           public.fn_is_platform_admin()
+           public.fn_is_platform_admin_full()
            or ((organization_id in (select * from public.fn_user_org_ids()))
                and public.fn_role_at_least(organization_id, ''agent''))
          )',

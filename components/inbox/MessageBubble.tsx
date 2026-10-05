@@ -14,6 +14,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Message } from "@/lib/types/messaging";
+import { lerRemetenteDeGrupo, rotuloDoRemetente } from "@/lib/messaging/remetente-de-grupo";
 import { CitationButton } from "@/components/ai/CitationButton";
 import { MediaRenderer } from "@/components/inbox/media/MediaRenderer";
 import { ContactCard } from "@/components/inbox/media/ContactCard";
@@ -26,6 +27,7 @@ import {
 
 interface Props {
   message: Message;
+  searchMatch?: boolean;
   debugCitations?: boolean;
   /** Escolher esta mensagem para responder "em cima" dela. */
   onResponder?: (m: Message) => void;
@@ -63,6 +65,7 @@ function AckIndicator({ status, t }: { status: string; t: (texto: string) => str
 
 export function MessageBubble({
   message,
+  searchMatch = false,
   debugCitations,
   onResponder,
   citada,
@@ -173,6 +176,12 @@ export function MessageBubble({
     }
     return null;
   })();
+  // QUEM MANDOU, num grupo. Só faz sentido em mensagem RECEBIDA: uma mensagem
+  // que ESTE CRM enviou não tem remetente a descobrir, é sempre o atendente (ou
+  // a IA) — e `senderLabel`, acima, já diz quem foi. A leitura do dado bruto é
+  // `lerRemetenteDeGrupo` (Task 2): este componente não conhece o formato de
+  // `metadata.group_sender`, só o resultado já validado.
+  const remetente = !isOutbound ? lerRemetenteDeGrupo(message.metadata) : null;
 
   async function salvarEdicao() {
     const novoTexto = texto.trim();
@@ -188,6 +197,7 @@ export function MessageBubble({
 
   return (
     <div
+      data-search-match={searchMatch || undefined}
       className={cn(
         "group flex w-full min-w-0 items-center gap-1 px-4 py-1",
         isOutbound ? "justify-end" : "justify-start",
@@ -211,6 +221,9 @@ export function MessageBubble({
                   : "rounded-bl-sm bg-muted text-foreground",
               ),
           isFailed && "border border-destructive",
+          // A marca da busca é ANEL, não cor de fundo: o fundo já diz de quem é
+          // a mensagem, e trocá-lo apagaria essa leitura justo na bolha achada.
+          searchMatch && "ring-2 ring-foreground ring-offset-2 ring-offset-background",
           apagada && "opacity-70",
         )}
       >
@@ -307,6 +320,11 @@ export function MessageBubble({
             </div>
           </div>
         )}
+        {remetente && (
+          <p className="mb-0.5 text-[11px] font-medium text-muted-foreground">
+            {rotuloDoRemetente(remetente)}
+          </p>
+        )}
         {senderLabel && (
           <div className="mb-0.5 flex items-center gap-1 text-[11px] font-semibold opacity-80">
             {senderLabel === "IA" ? (
@@ -356,7 +374,7 @@ export function MessageBubble({
           <>
             {hasMedia && (
               <div className={cn(message.body && "mb-1")}>
-                <MediaRenderer message={message} />
+                <MediaRenderer message={message} agora={agora} />
               </div>
             )}
 
@@ -433,7 +451,7 @@ export function MessageBubble({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("Ocultar esta mensagem no CRM?")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("A mensagem continua no WhatsApp do cliente e no registro da empresa. Um gestor pode restaurá-la aqui.")}</AlertDialogDescription>
+            <AlertDialogDescription>{t("A mensagem continua na conversa do cliente e no registro da empresa. Um gestor pode restaurá-la aqui.")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={ocupado}>{t("Cancelar")}</AlertDialogCancel>

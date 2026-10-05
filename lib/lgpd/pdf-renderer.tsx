@@ -298,6 +298,31 @@ export function LgpdExportPdf({ data, unsignedWarning }: Props): React.ReactElem
                   {fmtDate(m.created_at)} · {m.direction} · {m.type} · {m.status}
                 </Text>
                 <Text>{m.body ? m.body.slice(0, 280) : m.has_media ? "[mídia]" : "—"}</Text>
+                {m.media_derived_text ? (
+                  <Text style={styles.small}>
+                    transcrição/texto extraído da mídia: {m.media_derived_text.slice(0, 280)}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Mensagens em grupos de WhatsApp escritas pelo titular (migration 0482) */}
+        {data.group_messages_authored.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Mensagens em Grupos de WhatsApp</Text>
+            {data.group_messages_authored.slice(0, 25).map((m) => (
+              <View key={m.id} style={styles.itemBlock}>
+                <Text style={styles.small}>
+                  {fmtDate(m.created_at)} · {m.type}
+                </Text>
+                <Text>{m.body ? m.body.slice(0, 280) : m.has_media ? "[mídia]" : "—"}</Text>
+                {m.media_derived_text ? (
+                  <Text style={styles.small}>
+                    transcrição/texto extraído da mídia: {m.media_derived_text.slice(0, 280)}
+                  </Text>
+                ) : null}
               </View>
             ))}
           </View>
@@ -330,6 +355,27 @@ export function LgpdExportPdf({ data, unsignedWarning }: Props): React.ReactElem
                   {o.status} · {fmtMoney(o.total_cents, o.currency)}
                 </Text>
                 <Text style={styles.small}>Pedido em {fmtDate(o.ordered_at)}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Propostas — o documento comercial que a pessoa RECEBEU; sem esta
+            seção o relatório não mencionava proposta nenhuma. */}
+        {data.proposals?.length ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Propostas comerciais</Text>
+            {data.proposals.map((p) => (
+              <View key={p.id} style={styles.itemBlock}>
+                <Text>
+                  {p.numero != null && p.ano != null ? `Nº ${p.numero}/${p.ano} · ` : ""}
+                  {p.titulo} · {p.status} · {fmtMoney(p.total_cents, p.moeda)}
+                </Text>
+                <Text style={styles.small}>
+                  Criada em {fmtDate(p.created_at)}
+                  {p.sent_at ? ` · enviada em ${fmtDate(p.sent_at)}` : ""}
+                  {p.tem_pdf ? " · documento em PDF enviado" : ""}
+                </Text>
               </View>
             ))}
           </View>

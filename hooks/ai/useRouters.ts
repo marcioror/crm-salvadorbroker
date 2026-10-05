@@ -21,6 +21,9 @@ export interface RouterMember {
   position: number;
   /** Fluxo de atendimento que começa quando a intenção casa. `null` = só agente. */
   flow_pointer_id: string | null;
+  /** Funil de DESTINO do card quando a intenção casa (#2155). `null` = só roteia. */
+  pipeline_id: string | null;
+  stage_id: string | null;
 }
 
 export interface RouterMemberInput {
@@ -29,6 +32,9 @@ export interface RouterMemberInput {
   intent_description: string;
   examples: string[];
   flow_pointer_id: string | null;
+  /** Funil de DESTINO do card quando a intenção casa (#2155). `null` = só roteia. */
+  pipeline_id: string | null;
+  stage_id: string | null;
 }
 
 export interface RouterDetail {
@@ -56,6 +62,21 @@ export interface RouterTestResult {
   min_confidence: number;
   agent_id: string | null;
   agent_name: string | null;
+  /**
+   * O Jev na mesma frase, quando a tarefa do roteador dele roda. `null` com ela
+   * desligada; ausente na resposta da imagem anterior.
+   */
+  jev?: {
+    estado: "observando" | "decidindo";
+    respondeu: boolean;
+    intent_name: string | null;
+    /** A probabilidade da escolha dele; `null` quando ele não respondeu. */
+    confidence: number | null;
+    agent_id: string | null;
+    agent_name: string | null;
+    /** Em produção valeria a escolha dele (decidindo, e com a IA de sempre respondendo). */
+    decide: boolean;
+  } | null;
 }
 
 export interface CreateRouterInput {

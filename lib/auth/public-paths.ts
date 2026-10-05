@@ -3,6 +3,8 @@
  * Match precedence: array order. First match wins.
  */
 export const PUBLIC_PATHS: RegExp[] = [
+  // Link público persistido: org e destino são resolvidos exclusivamente no servidor.
+  /^\/api\/v1\/rastreio\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
   /^\/$/,
   /^\/login(\/.*)?$/,
   /^\/signup$/,
@@ -110,10 +112,34 @@ export const PUBLIC_PATHS: RegExp[] = [
   // método é a própria rota, como sempre foi.
   /^\/api\/v1\/agenda\/agendamentos$/,
   /^\/api\/v1\/conversations\/open-with-contact$/,
+  // CRIAÇÃO DE RASCUNHO SUGERIDO SERVER-TO-SERVER (issue #1611). Mesma
+  // dualidade da linha acima: sessão OU Bearer `dsk_…` com escopo `mcp:write`,
+  // resolvida por `lib/api/auth-dual.ts` DENTRO da rota
+  // (`app/api/v1/conversations/[id]/drafts/route.ts`). O `GET`/leitura do
+  // rascunho é da sessão do atendente (caixa de entrada) e NÃO entra aqui.
+  /^\/api\/v1\/conversations\/[^/]+\/drafts$/,
   // Upload outbound: primeiro passo do envio de MÍDIA por token. Sem ele, o
   // cartão de fidelidade (a única das automações que não é texto) não teria
   // como sair depois do corte de gateway.
   /^\/api\/v1\/conversations\/[^/]+\/media$/,
+  // CONFIGURAÇÃO DE IA, FOLLOW-UP E AGENDA SERVER-TO-SERVER (issue #1875).
+  // Mesma dualidade das linhas acima: sessão OU Bearer `dsk_…`, resolvidos por
+  // `lib/api/auth-dual.ts` DENTRO de cada rota (a org sai da linha do token e
+  // nunca do body). Quem automatiza a instalação (configuração como código) não
+  // tem navegador — e sem estas entradas o proxy devolve 401 antes do handler,
+  // tornando a dualidade inalcançável por token.
+  //
+  // Ancorados com `$` de propósito: `/^\/api\/v1\/ai\/followup-flows/` daria
+  // carona a `/[id]`, `/publish`, `/duplicate`, `/rollback`, etc., que seguem
+  // só-sessão (publicar e reverter continuam exigindo a tela). O segmento da
+  // versão é uma FORMA DE UUID, nunca `[^/]+` — `/api/v1/ai/agents/` tem irmãos
+  // literais (assignable, [id], etc.) que um padrão largo tornaria públicos.
+  /^\/api\/v1\/ai\/followup-flows$/,
+  /^\/api\/v1\/ai\/followup-flows\/from-model$/,
+  /^\/api\/v1\/ai\/agents$/,
+  /^\/api\/v1\/ai\/agents\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/versions$/i,
+  /^\/api\/v1\/prospecting$/,
+  /^\/api\/v1\/agenda\/tipos$/,
   /^\/_next\//,
   /^\/favicon\.ico$/,
   // O ícone da aba (`app/icon.tsx`), que o `<head>` de TODA página pede —
@@ -123,9 +149,10 @@ export const PUBLIC_PATHS: RegExp[] = [
   // antes desta linha: `GET /icon` → 307 para `/login?next=%2Ficon`, enquanto
   // `/icon.png` (inexistente) devolvia 404 — a diferença é só a extensão.
   /^\/icon$/,
+  // PNGs públicos do app instalado, apenas dois tamanhos e somente marca da instalação.
+  /^\/app-icon\/(192|512)$/,
   /^\/manifest\.webmanifest$/,
   /^\/team\/accept-invite\/.+$/,
-  /^\/account-suspended$/,
   // OS MOLDES DE E-MAIL DO GoTrue. Quem busca é o GoTrue, um processo de
   // terceiro que não tem — nem pode ter — sessão nossa. O conteúdo é HTML com
   // placeholders Go (`{{ .TokenHash }}`) mais nome, cor e logo da instalação,

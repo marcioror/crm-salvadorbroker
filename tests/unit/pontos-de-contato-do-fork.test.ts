@@ -164,6 +164,55 @@ const CONTATOS: Contato[] = [
       "reponha o `actor` no opts e a marcação `contact_protected`. Esta leitura ignora RLS, então sem o ator o telefone sai para qualquer atendente.",
   },
   {
+    arquivo: "lib/crm-b2b/people-handler.ts",
+    marca: "protegerContato(c, ctx.actor)",
+    oQueE: "a proteção na ficha da pessoa (CRM B2B) e no vínculo contato↔pessoa",
+    seSumir:
+      "reponha `protegerContato` nos contatos de `getPersonHandler` e `protegerTelefoneDoContatoEmbutido` no retorno de `linkContactToPersonHandler`, com `created_by_user_id` nos dois selects. Sem isso, /api/v1/people/:id devolve telefone e e-mail a qualquer viewer.",
+  },
+  {
+    arquivo: "components/kanban/NewLeadDialog.tsx",
+    marca: 'className="max-h-[90vh] overflow-y-auto"',
+    oQueE: "o diálogo de lead novo que cabe numa tela de 720 px",
+    seSumir:
+      "reponha a classe no `DialogContent`. Sem ela, com a lista do seletor de contato aberta, o botão \"Criar lead\" fica fora da tela e o properties.spec reprova em waitForResponse. Se o upstream corrigir do jeito dele, este ponto sai.",
+  },
+  {
+    arquivo: "app/api/v1/contacts/duplicates/route.ts",
+    marca: 'requireRole("manager"',
+    oQueE: "o gate manager na lista de duplicados, cuja chave é o telefone",
+    seSumir:
+      "reponha `requireRole(\"manager\", ...)` no GET. O upstream libera para viewer via `orgAtivaDaApi`, e a `chave` do agrupamento é o telefone normalizado: mascarar campo não adianta. Ajuste junto o controle positivo de tests/unit/api-nao-redireciona-org-suspensa.test.ts (19 nesta casa).",
+  },
+  {
+    arquivo: "scripts/conferir-isolamento-do-kit.sh",
+    marca: "https://github.com/melgarafael/DeskcommCRM.git",
+    oQueE: "a tag fixa v1.63.0 buscada no upstream quando o origin não a tem",
+    seSumir:
+      "reponha o `|| git fetch ... https://github.com/melgarafael/DeskcommCRM.git` em `update_sh_da`. O origin daqui só publica tags `-sb`, e sem o segundo endereço o job invariants reprova em \"couldn't find remote ref refs/tags/v1.63.0\".",
+  },
+  {
+    arquivo: "tests/unit/busca-de-contatos-normaliza-termo.test.ts",
+    marca: 'expect(colunas).toEqual(["name", "display_name"]);',
+    oQueE: "o teste de injeção na busca medindo o OR sem telefone e e-mail",
+    seSumir:
+      "o upstream espera quatro colunas porque não tem o portão `podeBuscarPorDadoSensivel` de contacts/_handler.ts. Com ator sem papel, aqui são só `name` e `display_name`; não ponha o telefone de volta no OR para o teste passar.",
+  },
+  {
+    arquivo: "supabase/local/imoveis.sql",
+    marca: "public.fn_is_platform_admin_full()",
+    oQueE: "a escrita de imóveis fechada ao suporte só leitura",
+    seSumir:
+      "a policy `_agent_write` de properties e properties_media volta a usar `fn_is_platform_admin_full()`. Com a função pura, o escopo `support_readonly` escreve no cadastro, e o invariante platform-admin-full-so-escreve reprova.",
+  },
+  {
+    arquivo: "tests/unit/api-nao-redireciona-org-suspensa.test.ts",
+    marca: ".toBeGreaterThanOrEqual(19)",
+    oQueE: "o controle positivo da cerca de org suspensa, um a menos pela rota de duplicados",
+    seSumir:
+      "se o upstream subir o número, desconte a rota `contacts/duplicates`, que nesta casa usa `requireRole(\"manager\")` e não `orgAtivaDaApi`.",
+  },
+  {
     arquivo: "lib/reports/atividades.ts",
     marca: "podeVerContatoSensivel",
     oQueE: "a proteção no relatório de atividades",

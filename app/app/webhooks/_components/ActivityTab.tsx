@@ -102,6 +102,8 @@ const MOTIVO_DA_PARADA: Record<string, string> = {
   no_target: "O evento que disparou a regra não trouxe um lead nem um contato para etiquetar.",
   no_lead_or_contact: "O evento que disparou a regra não trouxe um lead para criar ou mover.",
   cross_pipeline_move_not_allowed: "Mover um lead para outro funil está desligado nesta organização.",
+  lead_already_transferred_in_event:
+    "Outra regra deste mesmo evento já levou o lead para outro funil. Vale a primeira regra; esta não transfere de novo.",
   flow_not_active:
     "O funil escolhido não está ativo, então a inscrição não foi feita. Ative o funil ou escolha outro na automação.",
   live_enrollment_exists: "O contato já está em um funil ativo — esta ação não inscreve duas vezes.",
@@ -116,6 +118,26 @@ const MOTIVO_DA_PARADA: Record<string, string> = {
   missing_url: "Esta ação de webhook não tem endereço configurado. Abra a automação e preencha.",
   unknown_action:
     "A regra usa um tipo de ação que esta instalação não tem (pode ter saído em uma atualização). Abra a automação e escolha outra ação.",
+  // #1528 — o motor pula atribuir/mover nos gatilhos do trigger (laço).
+  acao_fecharia_laco:
+    "Neste gatilho esta ação não roda: atribuir responsável ou mover o lead dispararia a automação de novo, sem fim. Abra a automação e tire a ação.",
+  /*
+   * #1540 — a ação criar tarefa. Estes quatro não passam por literal nenhum
+   * em lib/automation: nascem em lib/tarefas/criar-tarefa.ts como
+   * `resultado.codigo` e chegam aqui pelo `reason` da ação (declaração em
+   * ORIGENS, no teste da guarda). A guarda não os varre — o produtor só lê
+   * propriedade chamada `reason`/`motivo`, e lá o nome é `codigo` —, então a
+   * lista é escrita a mão aqui por quem conhece o caso: sem ela a tela
+   * mostraria o código cru, que é o defeito da #1090.
+   */
+  sem_alvo:
+    "A tarefa não foi criada: o evento que disparou a regra não trouxe um lead nem um contato para pendurar nela.",
+  sem_dono:
+    "A tarefa não foi criada: a pessoa escolhida como responsável não ficou resolvida para esta tarefa. Escolha outro responsável na automação.",
+  titulo_vazio:
+    "A tarefa não foi criada: o título ficou vazio depois de preencher os campos do texto. Escreva um título que não dependa só de dado que faltou.",
+  falha:
+    "A tarefa não foi criada: o banco recusou a gravação. Tente de novo em alguns minutos; se persistir, abra a tarefa na agenda para ver o detalhe.",
 };
 
 function explicacaoDe(

@@ -128,6 +128,14 @@ Sem barreira, o cliente privilegiado não protegia nada e era só mais um ponto 
 contato com o upstream. Quem guarda `contacts/duplicates` é o gate `manager` da
 própria rota, que continua sendo divergência desta casa.
 
+Na v1.73.0 o upstream trocou o portão dessa rota (e de outras 19) por
+`orgAtivaDaApi`, para empresa suspensa receber 403 em JSON em vez de redirect, e
+liberou a lista para `viewer`. Aqui ela continua no `requireRole("manager")`,
+que já devolve o mesmo 403 `org_suspended` e ainda cobre MFA pendente, modo de
+suporte e a auditoria da recusa. Por isso o controle positivo da cerca
+`tests/unit/api-nao-redireciona-org-suspensa.test.ts` conta 19 rotas nesta casa,
+e não 20; os dois viraram pontos de contato vigiados.
+
 Duas customizações a mais foram **aposentadas** em 22/09, pelo mesmo motivo das
 cinco de 21/09 (o upstream passou a fazer o mesmo sozinho):
 
