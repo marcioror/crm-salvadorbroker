@@ -50,7 +50,6 @@ vi.mock("@/lib/logger", () => ({
 vi.mock("@/lib/channels/health", () => ({ sincronizarSaudeDaConexao: vi.fn(async () => {}) }));
 
 import { logger } from "@/lib/logger";
-import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { dispatchWahaEvent } from "@/lib/waha/ingest";
 
 const ORG = "org-1";
@@ -240,10 +239,15 @@ describe("#2448 · a conversa que começa pelo celular nasce no funil padrão", 
       // payload — que em `fromMe` é o da loja. Contato sem nome rotula pelo
       // número; sem número nenhum, cairia no "Novo contato pelo WhatsApp" do
       // `rotulo` da origem.
-      p_title: rotuloDoContato(CONTATO_NOVO),
+      //
+      // Desta casa: o título do lead nunca grava o telefone (proteção de
+      // contato, `lib/leads/nascimento-do-lead.ts`). Contato sem nome cai direto
+      // no rótulo neutro da origem, e o número fica fora do card.
+      p_title: "Novo contato pelo WhatsApp",
       p_tags: [],
     });
     expect(chamadas[0]!.args.p_title).not.toBe("Loja da Silva");
+    expect(String(chamadas[0]!.args.p_title)).not.toContain(String(CONTATO_NOVO.phone_number).replace(/\D/g, "").slice(-8));
 
     // O card não aparece "sozinho": a atividade sai com o motivo certo, que é
     // o que a linha do tempo mostra para quem abre o card.

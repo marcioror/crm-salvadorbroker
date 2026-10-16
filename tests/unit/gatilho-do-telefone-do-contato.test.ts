@@ -122,6 +122,9 @@ beforeEach(() => {
     name: "Cliente",
     display_name: "Cliente",
     consent: {},
+    // Desta casa (proteção de contato): quem edita telefone é quem cadastrou o
+    // contato. Sem isto o PATCH é recusado com 403 antes de chegar ao gatilho.
+    created_by_user_id: USUARIO,
   };
 });
 
