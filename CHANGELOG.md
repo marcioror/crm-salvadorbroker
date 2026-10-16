@@ -8,6 +8,23 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
 ## [Não lançado]
 
+## [1.83.0-sb.1] — 2026-10-16
+
+### ⚠️ Requer atenção
+
+- **A agenda e as tarefas passam a respeitar a visibilidade da empresa** Antes de
+  avisar a equipe, confira Configurações › Agenda: o que muda está explicado na
+  seção da 1.83.0, logo abaixo.
+
+### Corrigido
+
+- **Esta instalação acompanha a versão 1.83.0 do projeto de origem** As dez
+  versões publicadas pelo projeto de origem desde a 1.73.0 entram aqui de uma
+  vez, com o que cada uma trouxe listado logo abaixo. A busca de contatos
+  continua procurando por telefone e e-mail só para gerente e admin, e o PDF da
+  conversa, que é novo, só leva o telefone do contato para quem o cadastrou ou
+  para gerente e admin, como já acontece na tela.
+
 ## [1.83.0] — 2026-10-16
 
 ### ⚠️ Requer atenção
@@ -12098,6 +12115,8 @@ Primeira versão marcada do DeskcommCRM. O projeto vinha sendo desenvolvido publ
 [1.52.0]: https://github.com/melgarafael/DeskcommCRM/compare/v1.51.0...v1.52.0
 
 [Não lançado]: https://github.com/marcioror/crm-salvadorbroker/compare/v1.61.0-sb.1...HEAD
+[1.83.0-sb.1]: https://github.com/marcioror/crm-salvadorbroker/compare/v1.83.0...v1.83.0-sb.1
+[1.73.0-sb.1]: https://github.com/marcioror/crm-salvadorbroker/compare/v1.73.0...v1.73.0-sb.1
 [1.61.0-sb.1]: https://github.com/marcioror/crm-salvadorbroker/compare/v1.61.0...v1.61.0-sb.1
 [1.51.0-sb.1]: https://github.com/marcioror/crm-salvadorbroker/compare/v1.51.0...v1.51.0-sb.1
 [1.51.0]: https://github.com/melgarafael/DeskcommCRM/compare/v1.50.0...v1.51.0
