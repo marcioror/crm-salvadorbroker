@@ -55,6 +55,7 @@ const BASE = {
   cpf_hash: null,
   birthdate: null,
   is_blocked: false,
+  is_personal: false,
   blocked_reason: null,
   is_anonymized: false,
   anonymized_at: null,
@@ -72,6 +73,7 @@ const BASE = {
   // desta casa: os dois campos que a proteção de contato acrescentou ao tipo
   created_by_user_id: null,
   contact_protected: false,
+  ai_opt_out: false,
 } satisfies Contact;
 
 let contato: Contact = BASE;

@@ -61,9 +61,21 @@ function conversationRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+const TABELAS_VAZIAS = ["contacts"];
+
 function makeSupabase(rows: ReturnType<typeof conversationRow>[]) {
   const client = {
     from(table: string) {
+      // As consultas que o upstream acrescentou ao caminho (contatos pessoais,
+      // spec 21) devolvem vazio: nenhum contato daqui é pessoal.
+      if (TABELAS_VAZIAS.includes(table)) {
+        const vazio = {
+          select: () => vazio, eq: () => vazio, limit: () => vazio, in: () => vazio,
+          maybeSingle: async () => ({ data: null, error: null }),
+          then: (resolve: (v: { data: never[]; error: null }) => void) => resolve({ data: [], error: null }),
+        };
+        return vazio;
+      }
       if (table !== "conversations") throw new Error(`fake_supabase: tabela inesperada '${table}'`);
       const builder = {
         select: () => builder,

@@ -182,7 +182,7 @@ const CONTATOS: Contato[] = [
     marca: 'requireRole("manager"',
     oQueE: "o gate manager na lista de duplicados, cuja chave é o telefone",
     seSumir:
-      "reponha `requireRole(\"manager\", ...)` no GET. O upstream libera para viewer via `orgAtivaDaApi`, e a `chave` do agrupamento é o telefone normalizado: mascarar campo não adianta. Ajuste junto o controle positivo de tests/unit/api-nao-redireciona-org-suspensa.test.ts (19 nesta casa).",
+      "reponha `requireRole(\"manager\", ...)` no GET. O upstream libera para viewer via `orgAtivaDaApi`, e a `chave` do agrupamento é o telefone normalizado: mascarar campo não adianta.",
   },
   {
     arquivo: "scripts/conferir-isolamento-do-kit.sh",
@@ -206,11 +206,11 @@ const CONTATOS: Contato[] = [
       "a policy `_agent_write` de properties e properties_media volta a usar `fn_is_platform_admin_full()`. Com a função pura, o escopo `support_readonly` escreve no cadastro, e o invariante platform-admin-full-so-escreve reprova.",
   },
   {
-    arquivo: "tests/unit/api-nao-redireciona-org-suspensa.test.ts",
-    marca: ".toBeGreaterThanOrEqual(19)",
-    oQueE: "o controle positivo da cerca de org suspensa, um a menos pela rota de duplicados",
+    arquivo: "app/api/v1/conversations/[id]/export/route.ts",
+    marca: "protegerTelefoneDoContatoEmbutido(",
+    oQueE: "a proteção do telefone no PDF da conversa (rota nova da v1.83.0)",
     seSumir:
-      "se o upstream subir o número, desconte a rota `contacts/duplicates`, que nesta casa usa `requireRole(\"manager\")` e não `orgAtivaDaApi`.",
+      "aplique `protegerTelefoneDoContatoEmbutido` ao contato antes de montar o PDF e peça `created_by_user_id` no select. A rota aceita `agent`, e sem isso o atendente baixa impresso o telefone que a tela esconde.",
   },
   {
     arquivo: "lib/reports/atividades.ts",

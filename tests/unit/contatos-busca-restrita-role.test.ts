@@ -58,10 +58,10 @@ describe("busca de contatos — restrição por role (C4)", () => {
       id: "u-agent",
       role: "agent",
     });
-    expect(filtro).toContain("name.ilike");
-    expect(filtro).toContain("display_name.ilike");
-    expect(filtro).not.toContain("phone_number.ilike");
-    expect(filtro).not.toContain("email.ilike");
+    expect(filtro).toContain("name.imatch");
+    expect(filtro).toContain("display_name.imatch");
+    expect(filtro).not.toContain("phone_number.");
+    expect(filtro).not.toContain("email.");
     expect(filtro).not.toContain("cpf_hash.eq");
   });
 
@@ -71,15 +71,15 @@ describe("busca de contatos — restrição por role (C4)", () => {
       id: "u-viewer",
       role: "viewer",
     });
-    expect(filtro).not.toContain("phone_number.ilike");
-    expect(filtro).not.toContain("email.ilike");
+    expect(filtro).not.toContain("phone_number.");
+    expect(filtro).not.toContain("email.");
   });
 
   it("manager continua buscando por telefone/e-mail/cpf", async () => {
     const digits11 = "31988887777"; // 11 dígitos → dispara o ramo do cpf_hash
     const filtro = await filtroDaBusca(digits11, { type: "user", id: "u-mgr", role: "manager" });
-    expect(filtro).toContain("phone_number.ilike");
-    expect(filtro).toContain("email.ilike");
+    expect(filtro).toContain("phone_number.imatch");
+    expect(filtro).toContain("email.imatch");
     expect(filtro).toContain("cpf_hash.eq");
   });
 
@@ -89,8 +89,8 @@ describe("busca de contatos — restrição por role (C4)", () => {
       id: "u-admin",
       role: "admin",
     });
-    expect(filtro).toContain("phone_number.ilike");
-    expect(filtro).toContain("email.ilike");
+    expect(filtro).toContain("phone_number.imatch");
+    expect(filtro).toContain("email.imatch");
   });
 
   it("ator não-humano (ai_agent) continua buscando por telefone/e-mail — não é o corretor tentando levar o cliente", async () => {
@@ -99,7 +99,7 @@ describe("busca de contatos — restrição por role (C4)", () => {
       id: "run-1",
       role: "ai_operator",
     });
-    expect(filtro).toContain("phone_number.ilike");
-    expect(filtro).toContain("email.ilike");
+    expect(filtro).toContain("phone_number.imatch");
+    expect(filtro).toContain("email.imatch");
   });
 });

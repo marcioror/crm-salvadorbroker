@@ -14,8 +14,10 @@ const DIA = 24 * 60 * 60 * 1000;
 
 const base: EstadoDeElegibilidade = {
   orgStatus: "active",
+  canalDesativado: false,
   modo: "open",
   forceHuman: false,
+  aiOptOut: false,
   botSilencedUntil: null,
   assigneeKind: "ai",
   aiAuthorizedAt: null,
@@ -48,6 +50,35 @@ describe("decidirElegibilidade — gate 'open' (comportamento de hoje)", () => {
     expect(d.permite).toBe(false);
     expect(d.motivo).toBe("force_human");
     expect(d.bloqueioPorAllowlist).toBe(false);
+  });
+
+  it("#2379: 'sempre atendimento humano' bloqueia sozinho — mesmo com force_human já limpo e autorização vigente", () => {
+    const d = decidirElegibilidade({
+      ...base,
+      modo: "allowlist",
+      forceHuman: false,
+      aiOptOut: true,
+      aiAuthorizedAt: new Date(AGORA.getTime() - DIA),
+    });
+    expect(d.permite).toBe(false);
+    expect(d.motivo).toBe("ai_opt_out");
+    expect(d.bloqueioPorAllowlist).toBe(false);
+  });
+
+  it("#2379: montarEstadoDeElegibilidade só liga a marca com true literal", () => {
+    const cru = {
+      aiGate: "open",
+      forceHuman: false,
+      assigneeKind: null,
+      botSilencedUntil: null,
+      aiAuthorizedAt: null,
+      orgStatus: "active",
+      agora: AGORA,
+      ttlMs: DIA,
+    };
+    expect(montarEstadoDeElegibilidade({ ...cru, aiOptOut: true }).aiOptOut).toBe(true);
+    expect(montarEstadoDeElegibilidade({ ...cru, aiOptOut: null }).aiOptOut).toBe(false);
+    expect(montarEstadoDeElegibilidade({ ...cru, aiOptOut: "true" }).aiOptOut).toBe(false);
   });
 
   it("conversa com dono humano bloqueia mesmo com gate aberto", () => {
@@ -200,11 +231,37 @@ describe("decidirElegibilidade — organização não operante vence tudo", () =
   });
 });
 
+describe("decidirElegibilidade — canal desativado vence tudo (menos org parada)", () => {
+  it("canalDesativado nega com canal_desativado mesmo com gate aberto e sem nenhuma outra trava", () => {
+    const d = decidirElegibilidade({ ...base, modo: "open", canalDesativado: true });
+    expect(d).toEqual({ permite: false, motivo: "canal_desativado", bloqueioPorAllowlist: false });
+  });
+
+  it("canalDesativado vence force_human, silêncio, dono humano e allowlist", () => {
+    const d = decidirElegibilidade({
+      ...base,
+      modo: "allowlist",
+      canalDesativado: true,
+      forceHuman: true,
+      botSilencedUntil: new Date(AGORA.getTime() + DIA),
+      assigneeKind: "user",
+      aiAuthorizedAt: AGORA,
+    });
+    expect(d.motivo).toBe("canal_desativado");
+  });
+
+  it("org parada vence o canal (ordem declarada): org_nao_operante primeiro", () => {
+    const d = decidirElegibilidade({ ...base, orgStatus: "suspended", canalDesativado: true });
+    expect(d.motivo).toBe("org_nao_operante");
+  });
+});
+
 describe("montarEstadoDeElegibilidade — a org viaja", () => {
   it("orgStatus ausente vira null, e null é não operante (falha fechada)", () => {
     const e = montarEstadoDeElegibilidade({
       aiGate: null,
       forceHuman: false,
+      aiOptOut: false,
       assigneeKind: null,
       botSilencedUntil: null,
       aiAuthorizedAt: null,
@@ -214,5 +271,52 @@ describe("montarEstadoDeElegibilidade — a org viaja", () => {
     });
     expect(e.orgStatus).toBeNull();
     expect(decidirElegibilidade(e).motivo).toBe("org_nao_operante");
+  });
+
+  it("canalDesativado ausente vira false (banco anterior à chave segue ligando)", () => {
+    const e = montarEstadoDeElegibilidade({
+      aiGate: "open",
+      forceHuman: false,
+      aiOptOut: false,
+      assigneeKind: null,
+      botSilencedUntil: null,
+      aiAuthorizedAt: null,
+      orgStatus: "active",
+      agora: AGORA,
+      ttlMs: DIA,
+    });
+    expect(e.canalDesativado).toBe(false);
+    expect(decidirElegibilidade(e).motivo).toBe("gate_aberto");
+  });
+
+  it("só o booleano true desliga; 'true' string e 1 não", () => {
+    for (const cru of ["true", 1]) {
+      const e = montarEstadoDeElegibilidade({
+        aiGate: "open",
+        forceHuman: false,
+        aiOptOut: false,
+        assigneeKind: null,
+        botSilencedUntil: null,
+        aiAuthorizedAt: null,
+        orgStatus: "active",
+        canalDesativado: cru,
+        agora: AGORA,
+        ttlMs: DIA,
+      });
+      expect(e.canalDesativado).toBe(false);
+    }
+    const ligado = montarEstadoDeElegibilidade({
+      aiGate: "open",
+      forceHuman: false,
+      aiOptOut: false,
+      assigneeKind: null,
+      botSilencedUntil: null,
+      aiAuthorizedAt: null,
+      orgStatus: "active",
+      canalDesativado: true,
+      agora: AGORA,
+      ttlMs: DIA,
+    });
+    expect(decidirElegibilidade(ligado).motivo).toBe("canal_desativado");
   });
 });

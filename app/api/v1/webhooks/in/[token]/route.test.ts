@@ -58,7 +58,12 @@ function makeAdmin(cfg: AdminCfg = {}) {
                 }),
             }),
           }),
-          update: () => ({ eq: () => Promise.resolve({ data: null, error: null }) }),
+          // Duas igualdades desde a v1.83.0 (organização e id da fonte).
+          update: () => {
+            const fim = Promise.resolve({ data: null, error: null });
+            const cadeia = Object.assign(fim, { eq: () => cadeia });
+            return cadeia;
+          },
         };
       }
       if (table === "webhook_events_log") {
