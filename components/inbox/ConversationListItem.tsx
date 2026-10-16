@@ -5,7 +5,7 @@ import { useLocaleDeData } from "@/hooks/i18n/useLocaleDeData";
 import type { Locale } from "date-fns";
 import { format, formatDistanceToNowStrict } from "date-fns";
 import { useT } from "@/hooks/i18n/useT";
-import { Robot } from "@/lib/ui/icons";
+import { Check, Robot } from "@/lib/ui/icons";
 import { ChannelLogo } from "@/components/inbox/ChannelLogo";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import type { ConversationWithContact } from "@/hooks/inbox/useConversationsRealtime";
 import { rotuloDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { phoneForDisplay } from "@/lib/channels/phone-variants";
+import { rotuloDoCanalDaConversa } from "@/lib/channels/estado";
 
 interface Props {
   conversation: ConversationWithContact;
@@ -61,6 +62,18 @@ interface Props {
    * afirme nada".
    */
   automaticoDaOrg?: boolean;
+  /**
+   * Marca esta linha no lote (#2484, F1). Presente só quando a seleção
+   * múltipla está ligada — sem ela a caixa não aparece, e a lista continua
+   * sendo o que era.
+   */
+  selecionado?: boolean;
+  /**
+   * Liga o modo de seleção: com esta prop a linha ganha a caixa de marcação.
+   * A ação da caixa é SEPARADA do clique na linha — quem marca não abre a
+   * conversa, e quem abre não marca.
+   */
+  onAlternarSelecao?: (id: string) => void;
 }
 
 /**
@@ -134,6 +147,8 @@ export function ConversationListItem({
   mostrarAtendente,
   mostrarAutomatico = true,
   automaticoDaOrg,
+  selecionado = false,
+  onAlternarSelecao,
 }: Props) {
   const localeDaData = useLocaleDeData();
   const t = useT();
@@ -208,11 +223,17 @@ export function ConversationListItem({
       : (ROTULO_DO_COMANDO[comando.quem] ?? ROTULO_DO_COMANDO.ninguem),
   );
 
-  // O número DA EMPRESA por onde esta conversa chegou — não o do cliente. Com
-  // dois canais é o que decide o tom da resposta e qual número a pessoa vê
-  // respondendo. Cai no nome do canal quando não há número (canal recém-criado).
+  // QUEM MANDA ESTA CONVERSA — o número DA EMPRESA por onde ela chegou, não o
+  // do cliente. Com dois canais é o que decide o tom da resposta e qual número
+  // a pessoa vê respondendo.
+  //
+  // #2383: quando o canal tem nome ou número, o texto é o MESMO do card da tela
+  // de canais (`/app/connections`), com o nome amigável na frente — antes o
+  // número vencia o nome, e um canal chamado "Peças" saía na lista como o
+  // número cru. Sem canal associado (grupo, conversa sem sessão, não-WA) e sem
+  // nome E sem número o badge continua não existindo, como estava.
   const canal = conversation.channel_sessions ?? null;
-  const rotuloCanal = canal?.phone_number ?? canal?.display_name ?? null;
+  const rotuloCanal = rotuloDoCanalDaConversa(canal, t);
 
   const temSelos =
     visibleTags.length > 0 ||
@@ -222,17 +243,48 @@ export function ConversationListItem({
     Boolean(c?.is_anonymized);
 
   return (
-    <button
-      type="button"
-      data-conversation-id={conversation.id}
-      onClick={() => onSelect(conversation.id)}
+    <div
       className={cn(
-        "group relative flex w-full items-start gap-3 border-b border-border/70 px-3 py-2.5 text-left transition-colors hover:bg-surface-elevated",
-        "focus-visible:outline-hidden focus-visible:bg-surface-elevated",
-        isSelected && "bg-accent-50 hover:bg-accent-50",
+        "relative flex w-full items-start border-b border-border/70",
+        selecionado && "bg-accent-soft",
       )}
-      aria-current={isSelected ? "true" : undefined}
     >
+      {/*
+        A CAIXA DE SELEÇÃO (#2484, F1) — fora do botão da linha, de propósito:
+        controle interativo dentro de `<button>` é HTML inválido, e o clique na
+        caixa NÃO pode abrir a conversa. Marcar e abrir são gestos diferentes.
+      */}
+      {onAlternarSelecao && (
+        <button
+          type="button"
+          role="checkbox"
+          aria-checked={selecionado}
+          aria-label={t("Selecionar conversa")}
+          title={t("Selecionar conversa")}
+          data-testid={`selecao-em-lote-${conversation.id}`}
+          onClick={() => onAlternarSelecao(conversation.id)}
+          className={cn(
+            "mt-3 ml-2 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border transition-colors",
+            "focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent",
+            selecionado
+              ? "border-accent bg-accent text-accent-foreground"
+              : "border-input bg-background hover:bg-surface-elevated",
+          )}
+        >
+          {selecionado && <Check size={12} weight="bold" aria-hidden />}
+        </button>
+      )}
+      <button
+        type="button"
+        data-conversation-id={conversation.id}
+        onClick={() => onSelect(conversation.id)}
+        className={cn(
+          "group relative flex min-w-0 flex-1 items-start gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-elevated",
+          "focus-visible:outline-hidden focus-visible:bg-surface-elevated",
+          isSelected && "bg-accent-50 hover:bg-accent-50",
+        )}
+        aria-current={isSelected ? "true" : undefined}
+      >
       {isSelected && (
         <span className="absolute inset-y-0 left-0 w-0.5 bg-accent" aria-hidden />
       )}
@@ -346,13 +398,18 @@ export function ConversationListItem({
             {mostrarAtendente && comando.quem === "humano" && (
               <OwnerBadge ownerKind="user" ownerName={comando.nome ?? t("Atendente")} compacto />
             )}
+            {/* #2383: `min-w-0` + `max-w` + `truncate` — o mesmo tratamento do
+                badge do cabeçalho. Uma linha de badges é `flex-wrap`, então um
+                nome de canal comprido ESTOURARIA a faixa para fora da coluna da
+                lista (critério de aceite: layout utilizável com nomes maiores).
+                O `title` devolve o texto inteiro para quem passa o mouse. */}
             {mostrarCanal && rotuloCanal && (
               <Badge
                 variant="outline"
-                className="h-4 gap-1 px-1.5 text-[10px] font-normal text-text-muted"
+                className="h-4 min-w-0 max-w-[9rem] gap-1 truncate px-1.5 text-[10px] font-normal text-text-muted"
                 title={`${t("Entrou por")} ${rotuloCanal}`}
               >
-                {rotuloCanal}
+                <span className="truncate">{rotuloCanal}</span>
               </Badge>
             )}
             {c?.is_blocked && (
@@ -368,6 +425,7 @@ export function ConversationListItem({
           </div>
         )}
       </div>
-    </button>
+      </button>
+    </div>
   );
 }

@@ -28,6 +28,7 @@ const ORG_ID = "22222222-2222-4222-8222-222222222222";
 function supabaseComContatos(linhas: unknown[]) {
   const b: Record<string, unknown> = {};
   for (const m of ["select", "eq", "is", "order"]) b[m] = () => b;
+  b.range = () => Promise.resolve({ data: linhas, error: null, count: linhas.length });
   b.limit = () => Promise.resolve({ data: linhas, error: null });
   return { from: () => b };
 }

@@ -26,6 +26,23 @@
  * simplesmente não marca `reminder_sent_at`, e a próxima tenta de novo — o
  * adiamento é o silêncio, não uma fila nova.
  *
+ * **FORA DA JANELA DE 24 H DO CLIENTE NÃO VIRA "ENVIADO" (issue #2595).** O
+ * cron escolhia o primeiro canal WORKING e carimbava antes de enviar — e num
+ * canal com hetero-restrição (o canal social do parceiro: `freeformOutsideWindow:
+ * false` em `lib/channels/capabilities.ts`, e o comentário do arquivo mede que
+ * a API aceita com 200 e a Meta recusa a ENTREGA com 131047) o lembrete de quem
+ * reservou dias antes cairia fora da janela de 24 h da última mensagem do
+ * contato, seria carimbado como enviado e ninguém veria a recusa. A régua é a
+ * mesma de todo o resto do sistema — `estadoDaJanela` sobre
+ * `conversations.last_inbound_at`, o insumo que `before-send` e `followup-turn`
+ * já usam. O canal que não pode texto livre com a janela fechada NÃO é
+ * escolhido e o degrau NÃO carimba. Um remetente explícito ou vinculado não
+ * libera outro número; no automático só um elegível permite envio. Sem
+ * remetente seguro, o pulo sai registrado (Central de avisos, log do cron +
+ * `motivos` da resposta) e a próxima rodada tenta de novo — quando o cliente
+ * escrever, a janela abre e o lembrete sai. Para o canal que PODE, ou para o
+ * contato dentro da janela, nada muda.
+ *
  * **O carimbo é da TENTATIVA, não da entrega.** `sendMessageHandler` marca
  * `failed`/`queued` na própria mensagem e devolve normalmente; o estado da
  * entrega vive lá. Se este carimbo esperasse a entrega, um contato com número
@@ -128,9 +145,16 @@ import { IDIOMA_PADRAO, normalizarIdioma, type Idioma } from "@/lib/i18n/idiomas
 import { nomeDoContato } from "@/lib/contacts/rotulo-do-contato";
 import { logger } from "@/lib/logger";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { resolverRemetenteDoLembrete } from "@/lib/agenda/remetente-do-lembrete";
+import { atualizarAvisoDeRemetente } from "@/lib/agenda/aviso-de-remetente";
 import { moldeDoDegrau } from "@/lib/agenda/lembretes";
 import { autorizaCron } from "@/lib/auth/cron-auth";
-import { OrgNaoOperanteError, STATUS_OPERANTE, ehOperante, statusDaOrgEmbutida } from "@/lib/organizacao/operante";
+import {
+  OrgNaoOperanteError,
+  STATUS_OPERANTE,
+  ehOperante,
+  statusDaOrgEmbutida,
+} from "@/lib/organizacao/operante";
 
 export const dynamic = "force-dynamic";
 
@@ -141,6 +165,7 @@ const LIMITE_DA_VARREDURA = 200;
 const MAIOR_ANTECEDENCIA_MS = 43_200 * 60_000;
 
 interface TipoDoCompromisso {
+  reminder_channel_session_id?: string | null;
   name: string;
   reminder_enabled: boolean;
   reminder_minutes_before: number;
@@ -152,6 +177,7 @@ interface TipoDoCompromisso {
 }
 
 interface CompromissoAVencer {
+  conversation_id?: string | null;
   id: string;
   organization_id: string;
   contact_id: string;
@@ -200,10 +226,7 @@ function tipoDe(linha: CompromissoAVencer): TipoDoCompromisso | null {
  * `reminder_template_name` aponta para um modelo da organização; senão, esta
  * frase.
  */
-export function aplicarMoldeDoLembrete(
-  molde: string,
-  pecas: Record<string, string>,
-): string {
+export function aplicarMoldeDoLembrete(molde: string, pecas: Record<string, string>): string {
   return molde.replace(/\{\{\s*([a-zA-Z_]+)\s*\}\}/g, (literal, raw: string) => {
     const v = pecas[raw.toLowerCase()];
     return v === undefined ? literal : v;
@@ -329,6 +352,39 @@ export function vencidoNaMarcacao(
 }
 
 /**
+ * Véspera que cairia no MESMO DIA da marcação, no fuso da organização.
+ *
+ * `vencidoNaMarcacao` pega quem marca DEPOIS da hora do degrau. Fica de fora
+ * quem marca ANTES dela no mesmo dia: marcou hoje às 9h para amanhã às 14h, o
+ * degrau de 1 dia vence hoje às 14h e o cliente recebe "lembrando do seu
+ * compromisso amanhã" cinco horas depois de confirmar. Só degrau de 1 dia ou
+ * mais: o aviso curto (1h antes) no dia da marcação continua útil — marcou às
+ * 10h para as 18h, o aviso das 17h é lembrete de verdade.
+ *
+ * Sem `marcadoEm` ou sem fuso a guarda fica fora do caminho, pelo mesmo motivo
+ * de `vencidoNaMarcacao`.
+ */
+export function vesperaNoDiaDaMarcacao(
+  comeca: Date,
+  degrauMin: number,
+  marcadoEm: Date | null | undefined,
+  timezone: string | null | undefined,
+): boolean {
+  if (!marcadoEm || !timezone || degrauMin < 1440) return false;
+  // `organizations.timezone` é texto livre (Zod só limita o tamanho): um fuso
+  // inválido faz o `Intl` lançar RangeError, e aqui isso derrubaria a rodada
+  // inteira do cron, de TODAS as organizações. Sem fuso legível a guarda fica
+  // fora do caminho — o mesmo de hoje sem ela.
+  let dia: Intl.DateTimeFormat;
+  try {
+    dia = new Intl.DateTimeFormat("en-CA", { timeZone: timezone });
+  } catch {
+    return false;
+  }
+  return dia.format(new Date(comeca.getTime() - degrauMin * 60_000)) === dia.format(marcadoEm);
+}
+
+/**
  * Quais degraus de lembrete estão vencidos e ainda não saíram.
  *
  * Um tipo pode pedir mais de um aviso — um dia antes e de novo três horas antes,
@@ -397,6 +453,8 @@ export function degrausPendentes(input: {
    * direção de nunca reenviar).
    */
   enviadoEm?: Date | null;
+  /** Fuso da organização — a régua de "mesmo dia" de `vesperaNoDiaDaMarcacao`. */
+  timezone?: string | null;
 }): number[] {
   const enviados = new Set(input.jaEnviados ?? []);
   // ─── REMARCAÇÃO PARA MAIS LONGE REARMA O DEGRAU DA DATA NOVA (#2243) ──────
@@ -450,7 +508,8 @@ export function degrausPendentes(input: {
       (degrau) =>
         !enviados.has(degrau) &&
         estaNaHora(input.agora, input.comeca, degrau) &&
-        !vencidoNaMarcacao(input.comeca, degrau, marcadoEm),
+        !vencidoNaMarcacao(input.comeca, degrau, marcadoEm) &&
+        !vesperaNoDiaDaMarcacao(input.comeca, degrau, marcadoEm, input.timezone),
     )
     .sort((a, b) => b - a);
 }
@@ -464,6 +523,12 @@ async function handle(req: NextRequest): Promise<Response> {
 
   const admin = createAdminClient();
   const agora = new Date();
+  const { error: erroLimpeza } = await admin.rpc("fn_resolver_avisos_de_lembrete_expirados");
+  if (erroLimpeza)
+    logger.error("[agenda-reminder] falha ao resolver avisos vencidos", {
+      error: erroLimpeza.message,
+      requestId,
+    });
 
   // `!inner` no tipo: só interessa compromisso cujo TIPO pede lembrete. O corte
   // por `starts_at` usa a maior antecedência possível — o corte fino, que depende
@@ -471,8 +536,8 @@ async function handle(req: NextRequest): Promise<Response> {
   const { data, error } = await admin
     .from("calendar_appointments")
     .select(
-      "id, organization_id, contact_id, title, starts_at, created_at, starts_at_marked_at, location_details, reminder_sent_offsets_minutes, reminder_sent_at, " +
-        "calendar_event_types!inner(name, reminder_enabled, reminder_minutes_before, reminder_extra_offsets_minutes, reminder_template_name, reminder_body, reminder_bodies, location_details), organizations:organization_id!inner(status)",
+      "id, organization_id, contact_id, conversation_id, title, starts_at, created_at, starts_at_marked_at, location_details, reminder_sent_offsets_minutes, reminder_sent_at, " +
+        "calendar_event_types!inner(name, reminder_channel_session_id, reminder_enabled, reminder_minutes_before, reminder_extra_offsets_minutes, reminder_template_name, reminder_body, reminder_bodies, location_details), organizations:organization_id!inner(status)",
     )
     .eq("status", "confirmed")
     // Org parada sai no banco, ANTES do `limit`: filtrar só em memória a deixaria
@@ -515,6 +580,21 @@ async function handle(req: NextRequest): Promise<Response> {
     motivos[motivo] = (motivos[motivo] ?? 0) + 1;
   };
 
+  // Uma consulta por organização na rodada, não por compromisso: o fuso entra
+  // em `degrausPendentes`, antes de qualquer outra leitura da linha.
+  const organizacoes = new Map<string, { timezone: string | null; locale: string | null } | null>();
+  const organizacaoDe = async (id: string) => {
+    if (!organizacoes.has(id)) {
+      const { data: o } = await admin
+        .from("organizations")
+        .select("timezone, locale")
+        .eq("id", id)
+        .maybeSingle();
+      organizacoes.set(id, o ?? null);
+    }
+    return organizacoes.get(id) ?? null;
+  };
+
   for (const linha of linhas) {
     const tipo = tipoDe(linha);
     if (!tipo) {
@@ -534,6 +614,7 @@ async function handle(req: NextRequest): Promise<Response> {
       // O instante do último carimbo (#2243): sem ele a limpeza dos degraus
       // da data antiga fica de fora e a remarcação para mais longe não rearma.
       enviadoEm: linha.reminder_sent_at ? new Date(linha.reminder_sent_at) : null,
+      timezone: (await organizacaoDe(linha.organization_id))?.timezone ?? "America/Sao_Paulo",
     });
     if (pendentes.length === 0) {
       pular("ainda_nao");
@@ -572,18 +653,26 @@ async function handle(req: NextRequest): Promise<Response> {
       continue;
     }
 
-    const { data: canal } = await admin
-      .from("channel_sessions")
-      .select("id")
-      .eq("organization_id", org)
-      .eq("status", "WORKING")
-      .limit(1)
-      .maybeSingle();
-
-    if (!canal) {
-      pular("sem_canal");
+    // Configuração explícita do tipo → conversa da reserva → único canal elegível.
+    // Um vínculo indisponível não autoriza atravessar para outro número.
+    const escolha = await resolverRemetenteDoLembrete(
+      admin,
+      linha,
+      tipo.reminder_channel_session_id ?? null,
+      agora,
+    );
+    await atualizarAvisoDeRemetente(admin, org, linha.id, escolha.motivo);
+    if (!escolha.canal) {
+      logger.warn("[agenda-reminder] lembrete sem remetente seguro", {
+        appointmentId: linha.id,
+        organizationId: org,
+        motivo: escolha.motivo,
+        requestId,
+      });
+      pular(escolha.motivo);
       continue;
     }
+    const canal = escolha.canal;
 
     const foraDaJanela = await adiarAteAJanelaAbrir(admin, org, canal.id);
     if (foraDaJanela) {
@@ -591,11 +680,7 @@ async function handle(req: NextRequest): Promise<Response> {
       continue;
     }
 
-    const { data: organizacao } = await admin
-      .from("organizations")
-      .select("timezone, locale")
-      .eq("id", org)
-      .maybeSingle();
+    const organizacao = await organizacaoDe(org);
 
     let molde = moldeDoDegrau(tipo, Math.min(...pendentes));
     if (!molde && tipo.reminder_template_name) {
@@ -689,7 +774,11 @@ async function handle(req: NextRequest): Promise<Response> {
         continue;
       }
       const mensagem = err instanceof Error ? err.message : String(err);
-      logger.error("[agenda-reminder] envio falhou", { appointmentId: linha.id, error: mensagem, requestId });
+      logger.error("[agenda-reminder] envio falhou", {
+        appointmentId: linha.id,
+        error: mensagem,
+        requestId,
+      });
       pular("erro_no_envio");
     }
   }

@@ -18,7 +18,7 @@ import type { Idioma } from "@/lib/i18n/idiomas";
 import { roleAtLeast } from "@/lib/auth/types";
 import { canonicalPhoneBR, phoneLookupVariants } from "@/lib/channels/phone-variants";
 import { encontrarContatoPorTelefone } from "@/lib/channels/contato-por-telefone";
-import { hashCpf, encryptCpfSql } from "@/lib/contacts/cpf";
+import { camposCpfParaGravar, hashCpf } from "@/lib/contacts/cpf";
 import { podeVerContatoSensivel, protegerContato } from "@/lib/contacts/visibility";
 import type { Contact } from "@/lib/types/contacts";
 import { ensureConversation, sessaoProntaParaEnvio } from "@/lib/automation/start-conversation";
@@ -30,12 +30,13 @@ import type {
 } from "@/lib/schemas";
 import { contactListQuerySchema } from "@/lib/schemas";
 import { arrayDeUmValorParaOr } from "@/lib/inbox/marcador-da-conversa";
-import { buscaValeConsulta, normalizarTermoDeBusca } from "@/lib/inbox/termo-de-busca";
+import { buscaValeConsulta } from "@/lib/inbox/termo-de-busca";
+import { padraoRegexDeBusca } from "@/lib/contacts/busca-regex";
 
 type SB = SupabaseClient;
 
 const SELECT_COLS =
-  "id, organization_id, created_by_user_id, name, display_name, email, email_normalized, phone_number, cpf_hash, birthdate, is_blocked, blocked_reason, is_anonymized, anonymized_at, is_merged_into, merged_at, consent, tags, source, source_metadata, custom_fields, created_at, updated_at, last_activity_at, first_service_at";
+  "id, organization_id, created_by_user_id, name, display_name, email, email_normalized, phone_number, cpf_hash, birthdate, is_blocked, blocked_reason, is_personal, ai_opt_out, is_anonymized, anonymized_at, is_merged_into, merged_at, consent, tags, source, source_metadata, custom_fields, created_at, updated_at, last_activity_at, first_service_at";
 
 interface CursorPayload {
   sort: string | null;
@@ -162,25 +163,44 @@ export async function listContactsHandler(
     .limit(q.limit + 1);
 
   if (q.search && termoDeTexto !== undefined) {
-    // ─── Duas normalizações, em ordem, com responsabilidades diferentes ─────
-    // É a MESMA composição da busca de conversas
-    // (`conversations/_handler.ts:297`, `termoSeguroParaOr(normalizarTermoDeBusca(...))`):
+    // ─── O padrão sai em regex, não em LIKE (#1835, F2) ─────────────────────
+    // A composição continua a MESMA da busca de conversas
+    // (`conversations/_handler.ts:297`, `termoSeguroParaOr(normalizarTermoDeBusca(...))`)
+    // e continua sendo a régua única de `lib/inbox/termo-de-busca.ts` — o que
+    // muda é o DESTINO do padrão:
     //
     //   normalizarTermoDeBusca → como a PESSOA digitou: espaço duplo, vírgula e
     //                            ponto e vírgula colapsam num curinga só, então
-    //                            "Paulo  Lima" e "Paulo Jr" achem o "Paulo Lima Jr"
+    //                            "Paulo  Lima" e "Paulo Jr" acham o "Paulo Lima Jr"
     //                            e "Silva, Maria" não exige mais adjacência
-    //   saneamento de `%`/`_`  → gramática do LIKE: curinga digitado é literal
+    //   padraoRegexDeBusca     → o curinga vira `.*`, o `%`/`_` digitado continua
+    //                            literal, e a LETRA com grafias vira classe
+    //                            (`jo[aáàâãä]o`) — é ela que faz "Joao" achar
+    //                            "João" e "João" achar "Joao"
+    //
+    // Por que regex e não `ilike` (a parte medida da F2): `ILIKE` dobra a CAIXA,
+    // não o ACENTO — `lower("Á") = "á"`, que não é `"a"` —, e o banco não tem
+    // `unaccent` nenhum (`git grep unaccent origin/main -- supabase/` = 0) para
+    // chamar do lado de lá. Sem coluna materializada (migração + backfill + gatilho,
+    // a F2 que ficou de fora do #1892), a comparação de acento é NOSSA dos dois
+    // lados: o termo normalizado aqui, a coluna virando classe no padrão. O
+    // operador `imatch` (`~*`) resolve a caixa. Medido contra o PostgREST real
+    // (docker postgrest/postgrest:latest + postgres:17) antes de escrever esta
+    // linha: um só `or=` com as quatro colunas em `imatch` + as variantes de
+    // telefone em `ilike` devolve as seis linhas certas.
     //
     // Os PARÊNTESES saem ANTES da régua: são delimitador do DSL do `.or()` do
-    // PostgREST (um "(" sem fechar derrubaria o filtro inteiro com HTTP 400) e
-    // a normalização não os conhece — tirá-los depois deixaria `Paulo* Jr` com
-    // espaço solto, que não casa nada. Mesmo escape de sempre, mesmo defeito de
-    // sempre: um nome com vírgula injetaria condição extra no `.or()`.
-    const s = normalizarTermoDeBusca(termoDeTexto).replace(/[%_]/g, (m) => `\\${m}`);
+    // PostgREST (um "(" sem fechar derrubaria o filtro inteiro com HTTP 400 — no
+    // regex o Postgres devolve `2201B parentheses () not balanced`) e a régua não
+    // os conhece — tirá-los depois deixaria `Paulo* Jr` com espaço solto, que não
+    // casa nada. A VÍRGULA também não passa: `normalizarTermoDeBusca` usa ela
+    // como separador, e uma vírgula que sobrasse splitaria o `.or()` em duas
+    // condições (medido: `PGRST100 failed to parse logic tree`). Um nome com
+    // vírgula continua sem injetar condição nenhuma.
+    const s = padraoRegexDeBusca(termoDeTexto);
     const digits = q.search.replace(/\D/g, "");
     const orParts = [
-      `name.ilike.%${s}%`,
+      `name.imatch.${s}`,
       // ⚠️ `display_name` ESTAVA DE FORA, e é a coluna que a tela MOSTRA.
       //
       // Contato que entra pelo WhatsApp nasce só com `display_name` (o pushName);
@@ -199,7 +219,7 @@ export async function listContactsHandler(
       // um retorno para "Cliente Retorno E2E", o modelo chamou esta busca, levou
       // zero resultados para um contato que EXISTE, e desistiu — a demanda
       // morreria por uma coluna faltando no OR.
-      `display_name.ilike.%${s}%`,
+      `display_name.imatch.${s}`,
     ];
     // C4 (revisão final): busca por telefone/e-mail/cpf é ORÁCULO DE CONFIRMAÇÃO
     // pra quem não pode ver esses dados — um corretor sem acesso ao telefone de
@@ -218,7 +238,7 @@ export async function listContactsHandler(
     const podeBuscarPorDadoSensivel =
       ctx.actor.type !== "user" || roleAtLeast(ctx.actor.role, "manager");
     if (podeBuscarPorDadoSensivel) {
-      orParts.push(`email.ilike.%${s}%`, `phone_number.ilike.%${s}%`);
+      orParts.push(`email.imatch.${s}`, `phone_number.imatch.${s}`);
       if (digits.length >= 8) {
         // 10/11 dígitos sem DDI: no Brasil é DDD+local. Sem o 55, `3284793302`
         // não gera a variante com o 9 e o cadastro `+5532984793302` some da busca.
@@ -255,6 +275,12 @@ export async function listContactsHandler(
   }
   if (q.source) query = query.eq("source", q.source);
   if (soContato) query = query.eq("id", soContato);
+  // Pessoal fora da lista por padrão; `?pessoais=true` lista SÓ pessoais
+  // (spec 21, etapa 13 — a tela do filtro e o desmarcar). Sem esta linha a
+  // lista de Contatos furava pelo outro lado o esconderijo que o inbox
+  // construiu — e o MCP search herdaria o furo junto.
+  if (q.pessoais) query = query.eq("is_personal", true);
+  else query = query.eq("is_personal", false);
 
   if (q.cursor) {
     const c = decodeCursor(q.cursor);
@@ -482,9 +508,10 @@ export async function createContactHandler(
   };
 
   if (input.cpf) {
-    insertRow.cpf_hash = hashCpf(input.cpf);
-    const enc = await encryptCpfSql(supabase, input.cpf);
-    if (enc) insertRow.cpf_encrypted = enc;
+    // #2522: os DOIS campos ou NENHUM — o CHECK `contacts_cpf_consistency`
+    // recusa a linha inteira se só o hash for gravado. Sem cifra disponível
+    // (RPC ausente ou chave não semeada) o contato nasce SEM CPF.
+    Object.assign(insertRow, await camposCpfParaGravar(supabase, input.cpf));
   }
 
   const { data: created, error: insErr } = await supabase
@@ -676,9 +703,11 @@ export async function patchContactHandler(
     patch.consent = { ...anterior, ...input.consent };
   }
   if (input.cpf !== undefined) {
-    patch.cpf_hash = hashCpf(input.cpf);
-    const enc = await encryptCpfSql(supabase, input.cpf);
-    if (enc) patch.cpf_encrypted = enc;
+    // Mesma regra do create (#2522): os DOIS campos ou NENHUM. Quando a cifra
+    // falha aqui, o par ANTIGO permanece intacto (hash e texto continuam do
+    // mesmo CPF) — apagar só um dos dois seria a corrupção silenciosa que o
+    // CHECK existe para impedir.
+    Object.assign(patch, await camposCpfParaGravar(supabase, input.cpf));
   }
 
   if (Object.keys(patch).length === 0) {
@@ -778,6 +807,42 @@ export async function patchContactHandler(
           if (error) console.error("[contacts.patch] emit_event failed", error.message);
         });
     }
+  }
+
+  /**
+   * #2812 (segunda metade) — O CONTATO GANHOU TELEFONE.
+   *
+   * O gatilho `contact.phone_added` é a transição que faltava no vocabulário de
+   * automação: a ficha que estava SEM número passa a ter um. Emitido AQUI, e só
+   * aqui, por dois motivos que são a metade do trabalho:
+   *
+   *  - DEPOIS do UPDATE acima — a regra que este evento dispara lê a ficha para
+   *    decidir, e a guarda `checarGuardasDeContato` (lib/automation/guarda-do-contato.ts)
+   *    mata com `no_phone` (sem nova tentativa) quem chega sem número. Emitir
+   *    antes da gravação entregaria à regra um contato ainda vazio, e o defeito
+   *    é MUDO: a regra some sem erro, sem log e sem run.
+   *  - SÓ na TRANSIÇÃO (antes vazio/nulo, depois preenchido) — quem já tinha
+   *    número não "ganhou" nenhum, e tirar o número não é ganhá-lo. Um evento a
+   *    cada edição de ficha encheria a fila de automação com o que não aconteceu.
+   *
+   * A grafia do par é a MESMA de `contact.tag_added`, logo acima — e o `contact.phone_added`
+   * está irmão dele no mapa de gatilhos (lib/schemas/webhooks.ts).
+   */
+  const telefoneAntes = ((antes as { phone_number?: string | null }).phone_number ?? "").trim();
+  const telefoneDepois = ((contact as { phone_number?: string | null }).phone_number ?? "").trim();
+  if (!telefoneAntes && telefoneDepois) {
+    await createAdminClient()
+      .rpc("emit_event", {
+        p_event_type: "contact.phone_added",
+        p_entity_kind: "contact",
+        p_entity_id: contact.id,
+        p_payload: { phone_number: telefoneDepois },
+        p_metadata: { request_id: ctx.requestId, ...a.metadataActor },
+        p_organization_id: contact.organization_id,
+      })
+      .then(({ error }) => {
+        if (error) console.error("[contacts.patch] emit_event failed", error.message);
+      });
   }
 
   await audit({

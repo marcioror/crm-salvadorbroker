@@ -63,10 +63,22 @@ export interface EstadoDeElegibilidade {
    * montador novo que esquecer a organização não compila.
    */
   orgStatus: string | null;
+  /**
+   * `channel_sessions.metadata.disabled` — canal desligado pelo operador.
+   * Veto que vale SEMPRE (mesmo com o gate aberto): desativado nunca atende.
+   */
+  canalDesativado: boolean;
   /** `channel_sessions.metadata.ai_gate` já normalizado. */
   modo: AiGateMode;
   /** `contacts.force_human` — a trava irrevogável pelo agente (regra dura 2). */
   forceHuman: boolean;
+  /**
+   * `contacts.ai_opt_out` — a marca PERMANENTE "sempre atendimento humano"
+   * (migration 0624 / issue 2379). Convive com `force_human` de propósito: a
+   * devolução limpa `force_human`, e esta coluna é o que ela não alcança. Vetado
+   * nos dois transportes (pg e supabase) e nos guards de envio, pela mesma regra.
+   */
+  aiOptOut: boolean;
   /** `conversations.bot_silenced_until` (ou o da conversa em questão). `'infinity'` do Postgres vira `Infinity`. */
   botSilencedUntil: Date | number | null;
   /** `conversations.assignee_kind` — `'user'` = uma pessoa é a dona do thread. */
@@ -85,8 +97,10 @@ export interface EstadoDeElegibilidade {
 
 export type MotivoDeElegibilidade =
   | "org_nao_operante"
+  | "canal_desativado"
   | "gate_aberto"
   | "force_human"
+  | "ai_opt_out"
   | "conversa_silenciada"
   | "conversa_de_humano"
   | "fora_da_lista_de_teste"
@@ -122,8 +136,18 @@ export function decidirElegibilidade(e: EstadoDeElegibilidade): DecisaoDeElegibi
   if (!ehOperante(e.orgStatus)) {
     return { permite: false, motivo: "org_nao_operante", bloqueioPorAllowlist: false };
   }
+  if (e.canalDesativado) {
+    return { permite: false, motivo: "canal_desativado", bloqueioPorAllowlist: false };
+  }
   if (e.forceHuman) {
     return { permite: false, motivo: "force_human", bloqueioPorAllowlist: false };
+  }
+  // A marca PERMANENTE (issue 2379): mesmo com `force_human` já limpo pela
+  // devolução, o contato segue vetado — motivo próprio para o rastro de quem
+  // investiga por que a IA não respondeu ("force_human" diria que há uma
+  // passagem humana em andamento, e não é isso).
+  if (e.aiOptOut) {
+    return { permite: false, motivo: "ai_opt_out", bloqueioPorAllowlist: false };
   }
   if (silenciadoAgora(e.botSilencedUntil, e.agora)) {
     return { permite: false, motivo: "conversa_silenciada", bloqueioPorAllowlist: false };
@@ -193,10 +217,18 @@ export function montarEstadoDeElegibilidade(raw: {
   aiGate: unknown;
   /** `organizations.status`; obrigatório como CHAVE — quem monta tem de dizer de onde leu. */
   orgStatus: string | null | undefined;
+  /** `channel_sessions.metadata.disabled` (cru); só `true` desliga. */
+  canalDesativado?: unknown;
   aiGateMode?: unknown;
   aiTestPhoneNumbers?: unknown;
   contactPhoneNumber?: string | null;
   forceHuman: unknown;
+  /**
+   * `contacts.ai_opt_out` (cru). Obrigatório de propósito, igual a `forceHuman`:
+   * quem monta tem de dizer de onde leu, e um transporte novo que esqueça a
+   * coluna falha no typecompile em vez de virar uma devolução em verde.
+   */
+  aiOptOut: unknown;
   assigneeKind: string | null;
   botSilencedUntil: Date | string | number | null | undefined;
   aiAuthorizedAt: Date | string | null | undefined;
@@ -209,8 +241,10 @@ export function montarEstadoDeElegibilidade(raw: {
   const numerosDeTeste = lerNumerosDeTeste({ ai_test_phone_numbers: raw.aiTestPhoneNumbers });
   return {
     orgStatus: raw.orgStatus ?? null,
+    canalDesativado: raw.canalDesativado === true,
     modo,
     forceHuman: raw.forceHuman === true,
+    aiOptOut: raw.aiOptOut === true,
     botSilencedUntil: normalizarInstante(raw.botSilencedUntil),
     assigneeKind: raw.assigneeKind,
     aiAuthorizedAt: autorizadoEm instanceof Date ? autorizadoEm : null,

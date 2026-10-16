@@ -65,6 +65,7 @@ const CONTATO_LINHA = {
   cpf_hash: null,
   birthdate: null,
   is_blocked: false,
+  is_personal: false,
   blocked_reason: null,
   is_anonymized: false,
   anonymized_at: null,
@@ -83,6 +84,7 @@ const CONTATO_LINHA = {
   // e se o telefone/e-mail saíram mascarados.
   created_by_user_id: null,
   contact_protected: false,
+  ai_opt_out: false,
 } satisfies Contact;
 
 /** Onde a contagem enxerga: ficha existente e agenda desta organização. */
