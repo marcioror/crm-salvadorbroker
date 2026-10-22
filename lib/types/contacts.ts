@@ -9,6 +9,8 @@ export interface Contact {
   created_by_user_id: string | null;
   name: string | null;
   display_name: string | null;
+  /** Nome salvo na agenda do celular. SÓ A EQUIPE vê (`rotuloParaAEquipe`); nunca vai em mensagem. */
+  address_book_name?: string | null;
   email: string | null;
   email_normalized: string | null;
   phone_number: string | null;

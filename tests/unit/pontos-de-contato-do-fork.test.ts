@@ -193,10 +193,10 @@ const CONTATOS: Contato[] = [
   },
   {
     arquivo: "tests/unit/busca-de-contatos-normaliza-termo.test.ts",
-    marca: 'expect(colunas).toEqual(["name", "display_name"]);',
+    marca: 'expect(colunas).toEqual(["name", "display_name", "address_book_name"]);',
     oQueE: "o teste de injeção na busca medindo o OR sem telefone e e-mail",
     seSumir:
-      "o upstream espera quatro colunas porque não tem o portão `podeBuscarPorDadoSensivel` de contacts/_handler.ts. Com ator sem papel, aqui são só `name` e `display_name`; não ponha o telefone de volta no OR para o teste passar.",
+      "o upstream espera cinco colunas porque não tem o portão `podeBuscarPorDadoSensivel` de contacts/_handler.ts. Com ator sem papel, aqui são só `name`, `display_name` e `address_book_name`; não ponha o telefone nem o e-mail de volta no OR para o teste passar.",
   },
   {
     arquivo: "supabase/local/imoveis.sql",

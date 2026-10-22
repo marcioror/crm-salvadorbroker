@@ -62,12 +62,13 @@ function supabaseEspiao() {
 // para a cobertura da restrição em si. Este arquivo é sobre QUAIS colunas
 // entram no filtro, então o ator aqui precisa ser manager: sem isso, os testes
 // que checam `email.ilike`/`phone_number.ilike` testariam a coluna errada.
-async function filtroDaBusca(termo: string): Promise<string> {
+async function filtroDaBusca(termo: string, soContato?: string): Promise<string> {
   const { client, filtros } = supabaseEspiao();
   await listContactsHandler(
     client,
     { organization_id: ORG, actor: { type: "user", id: "u-1", role: "manager" }, requestId: "req" },
     { search: termo, limit: 20 },
+    soContato,
   );
   return filtros[0] ?? "";
 }
@@ -106,6 +107,20 @@ describe("busca de contatos", () => {
     const filtro = await filtroDaBusca("Cliente Retorno");
     expect(filtro).toContain("display_name.imatch.");
     expect(casaNoNome(filtro, "Cliente Retorno E2E"), `filtro=${filtro}`).toBe(true);
+  });
+
+  it("procura no nome da agenda do celular — a tela o mostra quando não há nome no CRM (#2439)", async () => {
+    const filtro = await filtroDaBusca("João obra");
+    expect(filtro).toContain("address_book_name.imatch.");
+  });
+
+  it("a busca do agente durante a conversa NÃO olha o nome da agenda — ele é só da equipe (#2439)", async () => {
+    // Com o contato do turno (`crm_search_contacts` em atendimento), casar na
+    // agenda faria a ferramenta responder ao modelo se o rótulo interno contém
+    // o termo — o mesmo vazamento que a guarda SO_DA_EQUIPE fecha no template.
+    const filtro = await filtroDaBusca("caloteira", "22222222-2222-4222-8222-222222222222");
+    expect(filtro).not.toContain("address_book_name");
+    expect(filtro).toContain("display_name.imatch.");
   });
 
   it("continua procurando nas colunas que já procurava", async () => {

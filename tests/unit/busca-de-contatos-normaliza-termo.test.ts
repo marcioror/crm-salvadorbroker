@@ -266,8 +266,8 @@ describe("busca de contatos: o termo é normalizado pela régua do repo (#1835, 
     const colunas = filtro.split(",").map((cond) => cond.split(".")[0]);
     // ⚠️ DESTA CASA: o ator aqui é `user` sem papel, e a proteção de contato
     // tira `email` e `phone_number` do OR de quem não é manager (buscar por eles
-    // confirmaria o dado protegido). No upstream são quatro colunas.
-    expect(colunas).toEqual(["name", "display_name"]);
+    // confirmaria o dado protegido). No upstream são cinco colunas.
+    expect(colunas).toEqual(["name", "display_name", "address_book_name"]);
     // O recorte por organização é parâmetro PRÓPRIO da query (E com o `or=`):
     // é ele que segura o caminho de service role (Bearer e MCP).
     expect(igualdades).toContainEqual(["organization_id", ORG]);
@@ -456,8 +456,8 @@ describe("busca de contatos: escape, colapso de * e acento fora da tabela (#2310
       expect(execucoes, JSON.stringify(ch)).toBe(1);
       expect(filtro, JSON.stringify(ch)).not.toMatch(/[()]/);
       const colunas = filtro.split(",").map((cond) => cond.split(".")[0]);
-      // Desta casa: duas colunas para quem não é gerente (no upstream, quatro).
-      expect(colunas, JSON.stringify(ch)).toEqual(["name", "display_name"]);
+      // Desta casa: três colunas para quem não é gerente (no upstream, cinco).
+      expect(colunas, JSON.stringify(ch)).toEqual(["name", "display_name", "address_book_name"]);
     }
   });
 });

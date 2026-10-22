@@ -131,7 +131,15 @@ export const ApiErrorCodes = {
 
   // 422 — semântica
   unprocessable_entity: "unprocessable_entity",
+  // 422, e é PRODUTO, não erro: o aviso do art. 12.º vale só para organizações
+  // FORA do Brasil (decisão de 2026-10-16). A organização brasileira não recebe
+  // "recusa parcial" — recebe a porta fechada, e a recebe ANTES de o e-mail
+  // sair, de o `due_at` ser tocado e de a auditoria registrar o aviso.
+  lgpd_art12_so_fora_do_brasil: "lgpd_art12_so_fora_do_brasil",
   plano_invalido: "plano_invalido", // plano inexistente, arquivado, de outro intervalo, ou cobrança desligada
+  // #2846: cobrança ligada, planos oferecidos e nenhum plano padrão — a empresa
+  // não nasce sem plano (doc 146). Quem administra define um padrão.
+  plano_obrigatorio: "plano_obrigatorio",
   // Cobrança do revendedor, PR 3a (spec §7a–§7g, §13). O provedor fora do ar é
   // 503 e o provedor que recusou é 502: a tela diz "tente de novo" num caso e
   // "confira os dados" no outro.
