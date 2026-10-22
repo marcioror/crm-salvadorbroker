@@ -53,6 +53,9 @@ const CONTATO = {
   updated_at: "2026-01-01T10:00:00.000Z",
   last_activity_at: null,
   first_service_at: null,
+  // desta casa: os dois campos que a proteção de contato acrescentou ao tipo
+  created_by_user_id: null,
+  contact_protected: false,
   ai_opt_out: false,
 } satisfies Contact;
 
@@ -69,7 +72,8 @@ function renderLista() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <ContactsListClient />
+      {/* desta casa: "Duplicados" só para gerente; aqui o papel não importa */}
+      <ContactsListClient podeJuntarDuplicados={false} />
     </QueryClientProvider>,
   );
 }
