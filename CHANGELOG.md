@@ -8,6 +8,25 @@ Se você roda o DeskcommCRM numa VPS, **leia a seção da versão para a qual es
 
 ## [Não lançado]
 
+## [1.87.0-sb.1] — 2026-10-22
+
+### ⚠️ Requer atenção
+
+- **Dois ajustes de configuração depois de atualizar** Confira o filtro de
+  palavras na tela de cada agente, que passa a valer e cala o agente em toda
+  mensagem sem uma das palavras, e marque como "Contato", em Configurações ›
+  Funis, os campos personalizados que a equipe preenche na ficha do contato.
+  Os dois estão explicados nas seções da 1.87.0 e da 1.86.0, logo abaixo.
+
+### Corrigido
+
+- **Esta instalação acompanha a versão 1.87.0 do projeto de origem** As quatro
+  versões publicadas pelo projeto de origem desde a 1.83.0 entram aqui de uma
+  vez, com o que cada uma trouxe listado logo abaixo. O nome que o contato tem
+  na agenda do celular passa a entrar na busca de contatos para toda a equipe,
+  enquanto a busca por telefone e e-mail continua só para gerente e admin, e a
+  tela de um caso da IA segue mostrando o telefone só para quem pode vê-lo.
+
 ## [1.87.0] — 2026-10-21
 
 ### ⚠️ Requer atenção
